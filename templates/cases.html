@@ -1,0 +1,37 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h2>Cases</h2>
+  <div>
+    <a href="{{ url_for('cases.new_case') }}" class="btn btn-primary">New Case</a>
+    <a href="{{ url_for('cases.manage_templates') }}" class="btn btn-secondary">Templates</a>
+  </div>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Template</th>
+      <th>Created</th>
+      <th>Created By</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for case in cases %}
+    <tr>
+      <td>{{ case.id }}</td>
+      <td>{{ templates[case.template_id] }}</td>
+      <td>{{ case.created_at[:19] if case.created_at }}</td>
+      <td>{{ case.created_by }}</td>
+      <td>
+        <a href="{{ url_for('cases.edit_case', case_id=case.id) }}" class="btn btn-sm btn-primary">Edit</a>
+        <form method="post" action="{{ url_for('cases.delete_case_route', case_id=case.id) }}" style="display:inline;" onsubmit="return confirm('Delete case?');">
+          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

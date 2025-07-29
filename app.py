@@ -17,6 +17,10 @@ CLIENT_SERVICE_QUEUE = {}
 from account_routes import account_bp
 app.register_blueprint(account_bp)
 
+# Register case management blueprint
+from case_routes import cases_bp
+app.register_blueprint(cases_bp)
+
 # Initialize database on startup
 try:
     from database_init import init_database

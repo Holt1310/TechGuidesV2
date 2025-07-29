@@ -804,3 +804,195 @@ def toggle_user_external_tool(username, tool_id):
     except Exception as e:
         print(f"Error toggling user external tool: {e}")
         return False, f"Failed to toggle tool: {str(e)}"
+
+
+# ===================== CASE TEMPLATES =====================
+
+def create_case_template(name, description, fields_json, created_by="admin"):
+    """Create a new case template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO case_templates (name, description, fields_json, created_at, updated_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    name,
+                    description,
+                    fields_json,
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                    created_by,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+    except Exception as e:
+        print(f"Error creating case template: {e}")
+        return None
+
+
+def get_case_template(template_id):
+    """Retrieve a case template by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM case_templates WHERE id = ?",
+                (template_id,),
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        print(f"Error fetching case template: {e}")
+        return None
+
+
+def get_all_case_templates():
+    """Get all case templates."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM case_templates ORDER BY name"
+            )
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error fetching case templates: {e}")
+        return []
+
+
+def update_case_template(template_id, name, description, fields_json):
+    """Update a case template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE case_templates
+                SET name = ?, description = ?, fields_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    name,
+                    description,
+                    fields_json,
+                    datetime.now().isoformat(),
+                    template_id,
+                ),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error updating case template: {e}")
+        return False
+
+
+def delete_case_template(template_id):
+    """Delete a case template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM case_templates WHERE id = ?",
+                (template_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting case template: {e}")
+        return False
+
+
+# ========================= CASES ==========================
+
+def create_case(template_id, data_json, created_by="admin"):
+    """Create a new case based on a template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO cases (template_id, data_json, created_at, updated_at, created_by)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    template_id,
+                    data_json,
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                    created_by,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+    except Exception as e:
+        print(f"Error creating case: {e}")
+        return None
+
+
+def get_case(case_id):
+    """Retrieve a case by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM cases WHERE id = ?", (case_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        print(f"Error fetching case: {e}")
+        return None
+
+
+def get_all_cases(limit=100):
+    """Get all cases."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM cases ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error fetching cases: {e}")
+        return []
+
+
+def update_case(case_id, data_json):
+    """Update case data."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE cases
+                SET data_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    data_json,
+                    datetime.now().isoformat(),
+                    case_id,
+                ),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error updating case: {e}")
+        return False
+
+
+def delete_case(case_id):
+    """Delete a case by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting case: {e}")
+        return False

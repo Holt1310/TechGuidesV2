@@ -28,3 +28,18 @@ Use the **Login** link to enter the admin password and create new posts. The
 default password can be set with the `TRUCKSOFT_ADMIN_PASSWORD` environment
 variable. The host and port may be customized with `TRUCKSOFT_HOST` and
 
+## Case Management
+
+Logged in admins can create structured cases using configurable templates.
+Use the **Cases** link in the navigation bar to view existing cases or start a
+new one. Case templates define the available fields and can be managed from the
+Templates page. Template definitions are stored in the database and support
+basic field dependencies using custom data tables.
+
+### Browser Automation
+
+The `client_tools` folder contains a small Selenium script for automatically
+creating cases. Download the Microsoft Edge WebDriver and place the binary in
+`client_tools/msedgedriver.exe`. Then run `python client_tools/case_creator.py`
+to login and submit a case based on a template. Selenium and related packages
+can be installed with `pip install selenium`.

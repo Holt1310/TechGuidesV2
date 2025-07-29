@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h2>Case Templates</h2>
+<div class="mb-3">
+  <form method="post">
+    <div class="row">
+      <div class="col-md-4">
+        <input type="text" name="name" class="form-control" placeholder="Template name" required>
+      </div>
+      <div class="col-md-6">
+        <input type="text" name="description" class="form-control" placeholder="Description">
+      </div>
+      <input type="hidden" name="fields_json" value="[]" id="fieldsJson">
+      <div class="col-md-2">
+        <button class="btn btn-primary" type="submit">Create</button>
+      </div>
+    </div>
+  </form>
+</div>
+<table class="table table-striped">
+  <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+  <tbody>
+    {% for t in templates %}
+    <tr>
+      <td>{{ t.name }}</td>
+      <td>{{ t.description }}</td>
+      <td>
+        <form method="post" action="{{ url_for('cases.delete_template', template_id=t.id) }}" onsubmit="return confirm('Delete template?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

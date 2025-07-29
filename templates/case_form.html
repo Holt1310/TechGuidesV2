@@ -1,0 +1,45 @@
+{% extends 'layout.html' %}
+{% block content %}
+{% if template %}
+<h2>{{ 'Edit' if case else 'New' }} Case - {{ template.name }}</h2>
+<form method="post" id="caseForm">
+  {% for field in fields %}
+  <div class="mb-3">
+    <label class="form-label">{{ field.name }}</label>
+    <input type="text" class="form-control" name="{{ field.id }}" value="{{ data.get(field.id, '') }}">
+  </div>
+  {% endfor %}
+  <button class="btn btn-primary">Save</button>
+</form>
+{% else %}
+<h2>Create Case</h2>
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Template</label>
+    <select name="template_id" class="form-select">
+      {% for t in templates %}
+      <option value="{{ t.id }}">{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-primary">Continue</button>
+</form>
+{% endif %}
+{% if template %}
+<script src="{{ url_for('static', filename='js/case-form.js') }}"></script>
+<script>
+const relations = {};
+{% for field in fields %}
+  {% if field.dependent_fields %}
+    relations["{{ field.id }}"] = {
+      table: "{{ field.data_source.table_name if field.data_source }}",
+      match_column: "{{ field.data_source.match_column if field.data_source }}",
+      return_columns: [{% for dep in field.dependent_fields %}"{{ dep.source_column }}",{% endfor %}],
+      targets: [{% for dep in field.dependent_fields %}"{{ dep.field_id }}",{% endfor %}]
+    };
+  {% endif %}
+{% endfor %}
+setupDependencies(relations);
+</script>
+{% endif %}
+{% endblock %}
