@@ -26,22 +26,28 @@
             <li class="nav-item">
               <a class="nav-link" href="/new">New Post</a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/categories">Categories</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/resources-admin">Resource CFG</a>
-            </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/categories">Categories</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/cases">Cases</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/resources-admin">Resource CFG</a>
+              </li>
             {% if session.get('secret_admin') %}
             <li class="nav-item">
               <a class="nav-link" href="/admin/external-tools">External Tools CFG</a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/admin/data-tables">Data Tables</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/manage-admins">Admin CFG</a>
-            </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/admin/data-tables">Data Tables</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/admin/case-templates">Case Templates</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/manage-admins">Admin CFG</a>
+              </li>
             {% endif %}
             <li class="nav-item">
               <a class="nav-link" href="/account"><i class="bi bi-person-circle"></i> My Account</a>

@@ -1,0 +1,10 @@
+{
+  "url": "http://localhost:5151",
+  "username": "admin",
+  "password": "secret",
+  "template_id": 1,
+  "fields": {
+    "subject": "Automated case",
+    "description": "Created by Selenium"
+  }
+}

@@ -2043,6 +2043,144 @@ def manage_table_data(table_name):
                          success=success)
 
 
+# ---------------------------------------------------------------------------
+# Case Templates Management
+# ---------------------------------------------------------------------------
+
+@app.route('/admin/case-templates')
+def case_templates():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    try:
+        from db_utils import get_case_templates
+        templates = get_case_templates()
+    except Exception as e:
+        print(f"Error loading case templates: {e}")
+        templates = []
+    return render_template('admin_case_templates.html', templates=templates)
+
+
+@app.route('/admin/case-templates/new', methods=['GET', 'POST'])
+def new_case_template():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    error = None
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        fields_json = request.form.get('fields', '[]')
+        rules_json = request.form.get('rules', '[]')
+        try:
+            fields = json.loads(fields_json)
+            rules = json.loads(rules_json) if rules_json else []
+            from db_utils import create_case_template
+            create_case_template(name, description, fields, rules, session.get('username', 'admin'))
+            return redirect(url_for('case_templates'))
+        except Exception as e:
+            error = f"Error saving template: {e}"
+    return render_template('case_template_form.html', template=None, error=error)
+
+
+@app.route('/admin/case-templates/<int:template_id>/edit', methods=['GET', 'POST'])
+def edit_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    error = None
+    from db_utils import get_case_template, update_case_template
+    template = get_case_template(template_id)
+    if not template:
+        return redirect(url_for('case_templates'))
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        fields_json = request.form.get('fields', '[]')
+        rules_json = request.form.get('rules', '[]')
+        try:
+            fields = json.loads(fields_json)
+            rules = json.loads(rules_json) if rules_json else []
+            update_case_template(template_id, name, description, fields, rules)
+            return redirect(url_for('case_templates'))
+        except Exception as e:
+            error = f"Error updating template: {e}"
+    return render_template('case_template_form.html', template=template, error=error)
+
+
+@app.route('/admin/case-templates/<int:template_id>/delete', methods=['POST'])
+def delete_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    from db_utils import delete_case_template
+    delete_case_template(template_id)
+    return redirect(url_for('case_templates'))
+
+
+# ---------------------------------------------------------------------------
+# Cases CRUD
+# ---------------------------------------------------------------------------
+
+@app.route('/cases')
+def cases():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    search = request.args.get('search', '').lower()
+    template_filter = request.args.get('template', 'all')
+    from db_utils import get_all_cases, get_case_templates
+    cases = get_all_cases()
+    templates = get_case_templates()
+    filtered = []
+    for c in cases:
+        if template_filter != 'all' and str(c['template_id']) != template_filter:
+            continue
+        if search and search not in json.dumps(c['case_data']).lower():
+            continue
+        filtered.append(c)
+    return render_template('cases.html', cases=filtered, templates=templates, search=search, template_filter=template_filter)
+
+
+@app.route('/cases/new', methods=['GET', 'POST'])
+def new_case():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    template_id = request.args.get('template_id') or request.form.get('template_id')
+    from db_utils import get_case_templates, get_case_template, create_case
+    if not template_id:
+        templates = get_case_templates()
+        if not templates:
+            return redirect(url_for('case_templates'))
+        template_id = templates[0]['id']
+    template = get_case_template(int(template_id))
+    if request.method == 'POST':
+        case_data = {f['id']: request.form.get(f['id'], '') for f in template['fields']}
+        create_case(template['id'], case_data, session.get('username', 'admin'))
+        return redirect(url_for('cases'))
+    return render_template('case_form.html', template=template, case=None)
+
+
+@app.route('/cases/edit/<int:case_id>', methods=['GET', 'POST'])
+def edit_case(case_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    from db_utils import get_case, get_case_template, update_case
+    case = get_case(case_id)
+    if not case:
+        return redirect(url_for('cases'))
+    template = get_case_template(case['template_id'])
+    if request.method == 'POST':
+        case_data = {f['id']: request.form.get(f['id'], '') for f in template['fields']}
+        update_case(case_id, case_data)
+        return redirect(url_for('cases'))
+    return render_template('case_form.html', template=template, case=case)
+
+
+@app.route('/cases/delete/<int:case_id>', methods=['POST'])
+def delete_case(case_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    from db_utils import delete_case
+    delete_case(case_id)
+    return redirect(url_for('cases'))
+
+
 @app.route('/api/data-tables')
 def api_get_data_tables():
     """API endpoint to get list of custom data tables for other integrations."""
@@ -2096,6 +2234,27 @@ def api_get_table_data(table_name):
     except Exception as e:
         print(f"Error in API get table data for {table_name}: {e}")
         return jsonify({'error': 'Failed to load table data'}), 500
+
+
+@app.route('/api/data-tables/<table_name>/related')
+def api_get_related_data(table_name):
+    """Return a single row from a table matching a column value."""
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    column = request.args.get('column', '')
+    value = request.args.get('value', '')
+    return_cols = request.args.getlist('return')
+
+    try:
+        from db_utils import get_custom_table_related_data
+        row = get_custom_table_related_data(f"custom_{table_name}", column, value, return_cols)
+        if row is None:
+            return jsonify({'success': True, 'row': None})
+        return jsonify({'success': True, 'row': row})
+    except Exception as e:
+        print(f"Error getting related data for {table_name}: {e}")
+        return jsonify({'error': 'Failed to get related data'}), 500
 
 
 if __name__ == '__main__':
