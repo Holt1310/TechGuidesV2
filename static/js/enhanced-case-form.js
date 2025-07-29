@@ -61,13 +61,11 @@ function loadDataTableOptions(selectField, tableId) {
     selectField.classList.add('loading');
     selectField.disabled = true;
     
-    // Note: This would need to be updated to use the correct API endpoint
-    // For now, using a placeholder endpoint
-    fetch(`/enhanced/api/data-tables/${tableId}/records`)
+    fetch(`/enhanced/api/data-tables/${tableId}/search?q=&limit=100`)
         .then(response => response.json())
         .then(data => {
-            if (data.success && data.records) {
-                populateSelectOptions(selectField, data.records);
+            if (data.success && data.results) {
+                populateSelectOptions(selectField, data.results);
             } else {
                 console.error('Failed to load data table options:', data.message);
                 showFieldError(selectField, 'Failed to load options');

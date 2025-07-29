@@ -9,7 +9,8 @@ from enhanced_db_utils import (
     create_enhanced_template, get_template_with_fields, create_enhanced_case,
     update_case_field, get_cases_list, create_data_table, add_data_table_record,
     search_data_table, get_data_tables_list, validate_field_dependencies,
-    get_field_options_for_dependency, get_templates_list
+    get_field_options_for_dependency, get_templates_list,
+    delete_enhanced_template, update_enhanced_template
 )
 
 enhanced_bp = Blueprint('enhanced', __name__, url_prefix='/enhanced')
@@ -21,6 +22,32 @@ def template_builder():
         return redirect(url_for('login'))
     
     return render_template('enhanced_template_editor.html')
+
+
+@enhanced_bp.route('/template/<int:template_id>/preview')
+def preview_template(template_id):
+    """Preview a template with its fields displayed read-only."""
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    template_data, message = get_template_with_fields(template_id)
+    if not template_data:
+        return message, 404
+
+    return render_template('enhanced_template_preview.html', template=template_data)
+
+
+@enhanced_bp.route('/template/<int:template_id>/edit')
+def edit_template(template_id):
+    """Edit an existing template using the builder."""
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    template_data, message = get_template_with_fields(template_id)
+    if not template_data:
+        return message, 404
+
+    return render_template('enhanced_template_editor.html', existing_template=template_data)
 
 @enhanced_bp.route('/templates')
 def templates_list():
@@ -137,6 +164,40 @@ def api_get_template(template_id):
         return jsonify({'success': True, 'template': template_data})
     else:
         return jsonify({'success': False, 'message': message}), 404
+
+
+@enhanced_bp.route('/api/templates/<int:template_id>/delete', methods=['DELETE'])
+def api_delete_template(template_id):
+    """API endpoint to delete a template."""
+    if 'username' not in session:
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    success, message = delete_enhanced_template(template_id)
+    status = 200 if success else 400
+    return jsonify({'success': success, 'message': message}), status
+
+
+@enhanced_bp.route('/api/templates/<int:template_id>/update', methods=['PUT'])
+def api_update_template(template_id):
+    """API endpoint to update an existing template."""
+    if 'username' not in session:
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    if not data or not data.get('name') or not data.get('fields'):
+        return jsonify({'success': False, 'message': 'Name and fields are required'}), 400
+
+    success, message = update_enhanced_template(
+        template_id,
+        data['name'],
+        data.get('description', ''),
+        data.get('category', 'General'),
+        data['fields'],
+        session['username']
+    )
+
+    status = 200 if success else 400
+    return jsonify({'success': success, 'message': message}), status
 
 @enhanced_bp.route('/api/cases/create', methods=['POST'])
 def api_create_case():

@@ -9,6 +9,7 @@ class EnhancedTemplateEditor {
         this.currentFieldType = null;
         this.editingFieldIndex = -1;
         this.dataTables = [];
+        this.templateId = null;
         
         this.initializeEventListeners();
         this.initializeSortable();
@@ -820,12 +821,47 @@ class EnhancedTemplateEditor {
     }
     
     loadDataTables() {
-        // This would load data tables from the server
-        // For now, using mock data
-        this.dataTables = [
-            { id: 1, table_name: 'departments', display_name: 'Departments', record_count: 4 },
-            { id: 2, table_name: 'categories', display_name: 'Issue Categories', record_count: 8 }
-        ];
+        fetch('/enhanced/api/data-tables')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    this.dataTables = data.tables;
+                } else {
+                    this.dataTables = [];
+                }
+                this.populateDataTableSelect();
+            })
+            .catch(() => {
+                this.dataTables = [];
+            });
+    }
+
+    loadExistingTemplate(data) {
+        if (!data) return;
+        this.templateId = data.template.id;
+        document.getElementById('templateName').value = data.template.name || '';
+        document.getElementById('templateDescription').value = data.template.description || '';
+        document.getElementById('templateCategory').value = data.template.category || 'General';
+
+        this.fields = data.fields.map(f => ({
+            field_id: f.field_id,
+            field_name: f.field_name,
+            field_type: f.field_type,
+            is_required: f.is_required,
+            config: JSON.parse(f.field_config || '{}'),
+            validation_rules: JSON.parse(f.validation_rules || '{}'),
+            dependencies: (data.dependencies && data.dependencies[f.id]) ? data.dependencies[f.id].map(d => ({
+                parent_field_id: d.parent_field_id,
+                condition_type: d.condition_type,
+                condition_value: d.condition_value,
+                action_type: d.action_type,
+                action_config: JSON.parse(d.action_config || '{}')
+            })) : []
+        }));
+
+        this.updateFieldsList();
+        this.updatePreview();
+        this.updateStatistics();
     }
     
     saveTemplate() {
@@ -846,9 +882,11 @@ class EnhancedTemplateEditor {
             return;
         }
         
-        // Send to server
-        fetch('/enhanced/api/templates/create', {
-            method: 'POST',
+        const url = this.templateId ? `/enhanced/api/templates/${this.templateId}/update` : '/enhanced/api/templates/create';
+        const method = this.templateId ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -857,6 +895,9 @@ class EnhancedTemplateEditor {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                if (data.template_id) {
+                    this.templateId = data.template_id;
+                }
                 alert('Template saved successfully!');
             } else {
                 alert('Error saving template: ' + data.message);
@@ -934,6 +975,10 @@ class EnhancedTemplateEditor {
 let templateEditor;
 document.addEventListener('DOMContentLoaded', function() {
     templateEditor = new EnhancedTemplateEditor();
+
+    if (window.existingTemplate) {
+        templateEditor.loadExistingTemplate(window.existingTemplate);
+    }
     
     // Make some methods globally accessible for onclick handlers
     window.addOption = templateEditor.addOption.bind(templateEditor);

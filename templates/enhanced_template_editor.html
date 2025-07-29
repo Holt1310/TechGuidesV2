@@ -397,6 +397,9 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    {% if existing_template %}
+    <script>window.existingTemplate = {{ existing_template|tojson }};</script>
+    {% endif %}
     <script src="/static/js/enhanced-template-editor.js"></script>
 </body>
 </html>

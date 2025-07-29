@@ -518,3 +518,78 @@ def get_field_options_for_dependency(parent_field_id, parent_value):
             
     except Exception as e:
         return [], f"Error getting field options: {str(e)}"
+
+def delete_enhanced_template(template_id):
+    """Delete an enhanced template if no cases reference it."""
+    try:
+        with get_enhanced_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM enhanced_cases WHERE template_id = ?', (template_id,))
+            if cursor.fetchone()[0] > 0:
+                return False, "Template is in use by existing cases"
+            cursor.execute('DELETE FROM enhanced_case_templates WHERE id = ?', (template_id,))
+            conn.commit()
+            return True, "Template deleted successfully"
+    except Exception as e:
+        return False, f"Error deleting template: {str(e)}"
+
+
+def update_enhanced_template(template_id, name, description, category, fields, updated_by="admin"):
+    """Update an existing enhanced template with new metadata and fields."""
+    try:
+        with get_enhanced_db_connection() as conn:
+            cursor = conn.cursor()
+            current_time = datetime.now().isoformat()
+
+            cursor.execute('''
+                UPDATE enhanced_case_templates
+                SET name = ?, description = ?, category = ?, updated_at = ?
+                WHERE id = ?
+            ''', (name, description, category, current_time, template_id))
+
+            cursor.execute('DELETE FROM template_fields WHERE template_id = ?', (template_id,))
+
+            for order, field in enumerate(fields):
+                cursor.execute('''
+                    INSERT INTO template_fields
+                    (template_id, field_id, field_name, field_type, is_required,
+                     display_order, field_config, validation_rules, conditional_logic,
+                     data_table_id, parent_field_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    template_id,
+                    field['field_id'],
+                    field['field_name'],
+                    field['field_type'],
+                    field.get('is_required', 0),
+                    order,
+                    json.dumps(field.get('config', {})),
+                    json.dumps(field.get('validation_rules', {})),
+                    json.dumps(field.get('conditional_logic', {})),
+                    field.get('data_table_id'),
+                    field.get('parent_field_id'),
+                    current_time
+                ))
+
+                field_record_id = cursor.lastrowid
+                if 'dependencies' in field:
+                    for dep in field['dependencies']:
+                        cursor.execute('''
+                            INSERT INTO field_dependencies
+                            (dependent_field_id, parent_field_id, condition_type, condition_value,
+                             action_type, action_config, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            field_record_id,
+                            dep['parent_field_id'],
+                            dep['condition_type'],
+                            dep.get('condition_value'),
+                            dep['action_type'],
+                            json.dumps(dep.get('action_config', {})),
+                            current_time
+                        ))
+
+            conn.commit()
+            return True, "Template updated successfully"
+    except Exception as e:
+        return False, f"Error updating template: {str(e)}"
