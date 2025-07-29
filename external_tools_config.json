@@ -1,5 +1,14 @@
 {
-  "server_tools": [],
+  "server_tools": [
+    {
+      "id": "case_creator",
+      "name": "Case Creator",
+      "type": "client_service",
+      "executable_path": "case_creator.py",
+      "is_enabled": true,
+      "visible": true
+    }
+  ],
   "settings": {
     "allow_custom_tools": true,
     "allow_user_tools": true,

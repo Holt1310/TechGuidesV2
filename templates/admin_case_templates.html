@@ -1,0 +1,30 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-card-list"></i> Case Templates</h2>
+  <a href="{{ url_for('new_case_template') }}" class="btn btn-primary">New Template</a>
+</div>
+{% if templates %}
+<table class="table table-striped">
+  <thead>
+    <tr><th>ID</th><th>Name</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+  {% for tpl in templates %}
+    <tr>
+      <td>{{ tpl.id }}</td>
+      <td>{{ tpl.name }}</td>
+      <td>
+        <a href="{{ url_for('edit_case_template', template_id=tpl.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+        <form method="post" action="{{ url_for('delete_case_template', template_id=tpl.id) }}" style="display:inline" onsubmit="return confirm('Delete template {{ tpl.name }}?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No templates found.</p>
+{% endif %}
+{% endblock %}

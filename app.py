@@ -2098,6 +2098,187 @@ def api_get_table_data(table_name):
         return jsonify({'error': 'Failed to load table data'}), 500
 
 
+# ---------------------------------------------------------------------------
+# Case Management Routes
+# ---------------------------------------------------------------------------
+
+@app.route('/cases')
+def case_list():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    from db_utils import list_cases, list_case_templates
+    cases = list_cases()
+    templates = {t['id']: t['name'] for t in list_case_templates()}
+    return render_template('cases.html', cases=cases, templates=templates)
+
+
+@app.route('/cases/new', methods=['GET', 'POST'])
+def new_case():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    template_id = request.args.get('template', type=int)
+    from db_utils import get_case_template, list_case_templates, create_case, get_custom_table_data
+    if not template_id:
+        templates = list_case_templates()
+        if not templates:
+            return redirect(url_for('manage_case_templates'))
+        template_id = templates[0]['id']
+
+    template = get_case_template(template_id)
+    if not template:
+        return redirect(url_for('case_list'))
+    fields = json.loads(template['fields_json']) if template.get('fields_json') else []
+
+    # Populate select options from custom tables if needed
+    for f in fields:
+        if f.get('type') == 'select' and f.get('data_source', {}).get('type') == 'custom_table':
+            table = f['data_source']['table_name']
+            value_col = f['data_source'].get('value_column') or 'id'
+            label_col = f['data_source'].get('label_column') or value_col
+            data, _ = get_custom_table_data(table, limit=100)
+            opts = []
+            if data:
+                for row in data['data']:
+                    opts.append({'value': row.get(value_col), 'label': row.get(label_col)})
+            f['options'] = opts
+
+    error = None
+    data = {}
+    if request.method == 'POST':
+        for f in fields:
+            val = request.form.get(f['id'], '')
+            data[f['id']] = val
+        success, result = create_case(template['id'], json.dumps(data), session.get('username','admin'))
+        if success:
+            return redirect(url_for('case_list'))
+        else:
+            error = result
+
+    return render_template('case_form.html', template=template, fields=fields, data=data, error=error, case=None)
+
+
+@app.route('/cases/edit/<int:case_id>', methods=['GET', 'POST'])
+def edit_case(case_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    from db_utils import get_case, get_case_template, update_case, get_custom_table_data
+    case = get_case(case_id)
+    if not case:
+        return redirect(url_for('case_list'))
+    template = get_case_template(case['template_id'])
+    if not template:
+        return redirect(url_for('case_list'))
+    fields = json.loads(template['fields_json']) if template.get('fields_json') else []
+    for f in fields:
+        if f.get('type') == 'select' and f.get('data_source', {}).get('type') == 'custom_table':
+            table = f['data_source']['table_name']
+            value_col = f['data_source'].get('value_column') or 'id'
+            label_col = f['data_source'].get('label_column') or value_col
+            data_tbl, _ = get_custom_table_data(table, limit=100)
+            opts = []
+            if data_tbl:
+                for row in data_tbl['data']:
+                    opts.append({'value': row.get(value_col), 'label': row.get(label_col)})
+            f['options'] = opts
+
+    stored_data = json.loads(case['data_json']) if case.get('data_json') else {}
+    error = None
+    if request.method == 'POST':
+        new_data = {}
+        for f in fields:
+            new_data[f['id']] = request.form.get(f['id'], '')
+        if update_case(case_id, json.dumps(new_data)):
+            return redirect(url_for('case_list'))
+        else:
+            error = 'Failed to update case'
+        stored_data = new_data
+    return render_template('case_form.html', template=template, fields=fields, data=stored_data, error=error, case=case)
+
+
+@app.route('/cases/delete/<int:case_id>', methods=['POST'])
+def delete_case(case_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    from db_utils import delete_case
+    delete_case(case_id)
+    return redirect(url_for('case_list'))
+
+
+@app.route('/admin/case-templates', methods=['GET'])
+def manage_case_templates():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    from db_utils import list_case_templates
+    templates = list_case_templates()
+    return render_template('admin_case_templates.html', templates=templates)
+
+
+@app.route('/admin/case-templates/new', methods=['GET', 'POST'])
+def new_case_template():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    from db_utils import create_case_template
+    error = None
+    if request.method == 'POST':
+        name = request.form.get('name','').strip()
+        fields_json = request.form.get('fields_json','').strip()
+        if name and fields_json:
+            success, res = create_case_template(name, fields_json, session.get('username','admin'))
+            if success:
+                return redirect(url_for('manage_case_templates'))
+            else:
+                error = res
+        else:
+            error = 'Name and fields JSON required'
+    example = json.dumps([{'id':'title','name':'Title','type':'text'}], indent=2)
+    return render_template('case_template_form.html', template=None, error=error, example_json=example)
+
+
+@app.route('/admin/case-templates/edit/<int:template_id>', methods=['GET', 'POST'])
+def edit_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    from db_utils import get_case_template, update_case_template
+    template = get_case_template(template_id)
+    if not template:
+        return redirect(url_for('manage_case_templates'))
+    error = None
+    if request.method == 'POST':
+        name = request.form.get('name','').strip()
+        fields_json = request.form.get('fields_json','').strip()
+        if name and fields_json:
+            update_case_template(template_id, fields_json)
+            # also update name
+            from db_utils import get_db_connection
+            with get_db_connection() as conn:
+                conn.execute('UPDATE case_templates SET name=? WHERE id=?', (name, template_id))
+                conn.commit()
+            return redirect(url_for('manage_case_templates'))
+        else:
+            error = 'Name and fields JSON required'
+        template['name'] = name
+        template['fields_json'] = fields_json
+    return render_template('case_template_form.html', template=template, error=error, example_json='')
+
+
+@app.route('/admin/case-templates/delete/<int:template_id>', methods=['POST'])
+def delete_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    from db_utils import delete_case_template
+    delete_case_template(template_id)
+    return redirect(url_for('manage_case_templates'))
+
+
+@app.route('/api/case-templates')
+def api_case_templates():
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Not authenticated'}), 401
+    from db_utils import list_case_templates
+    templates = list_case_templates()
+    return jsonify({'templates': templates, 'count': len(templates)})
+
+
 if __name__ == '__main__':
     # Automatically detect local IP address
     auto_ip = get_local_ip()

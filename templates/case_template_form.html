@@ -1,0 +1,18 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h2>{{ 'Edit' if template else 'New' }} Case Template</h2>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Template Name</label>
+    <input type="text" class="form-control" name="name" value="{{ template.name if template else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Fields JSON</label>
+    <textarea name="fields_json" class="form-control" rows="10" required>{{ template.fields_json if template else example_json }}</textarea>
+    <small class="form-text text-muted">Edit the JSON describing fields and dependencies.</small>
+  </div>
+  <button type="submit" class="btn btn-primary">Save</button>
+  <a href="{{ url_for('manage_case_templates') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

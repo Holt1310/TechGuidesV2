@@ -804,3 +804,196 @@ def toggle_user_external_tool(username, tool_id):
     except Exception as e:
         print(f"Error toggling user external tool: {e}")
         return False, f"Failed to toggle tool: {str(e)}"
+
+
+# ---------------------------------------------------------------------------
+# Case Template Management Functions
+# ---------------------------------------------------------------------------
+
+def create_case_template(name, fields_json, created_by="admin"):
+    """Create a new case template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            current_time = datetime.now().isoformat()
+
+            cursor.execute(
+                """
+                INSERT INTO case_templates (name, fields_json, created_at, updated_at, created_by)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name, fields_json, current_time, current_time, created_by),
+            )
+
+            conn.commit()
+            return True, cursor.lastrowid
+
+    except Exception as e:
+        print(f"Error creating case template: {e}")
+        return False, str(e)
+
+
+def get_case_template(template_id):
+    """Retrieve a case template by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM case_templates WHERE id = ?", (template_id,)
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        print(f"Error getting case template {template_id}: {e}")
+        return None
+
+
+def get_case_template_by_name(name):
+    """Retrieve a case template by name."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM case_templates WHERE name = ?", (name,)
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        print(f"Error getting case template by name {name}: {e}")
+        return None
+
+
+def list_case_templates():
+    """List all case templates."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM case_templates ORDER BY name"
+            )
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error listing case templates: {e}")
+        return []
+
+
+def update_case_template(template_id, fields_json):
+    """Update the fields of a case template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE case_templates
+                SET fields_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (fields_json, datetime.now().isoformat(), template_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error updating case template {template_id}: {e}")
+        return False
+
+
+def delete_case_template(template_id):
+    """Delete a case template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM case_templates WHERE id = ?",
+                (template_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting case template {template_id}: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Case CRUD Functions
+# ---------------------------------------------------------------------------
+
+def create_case(template_id, data_json, created_by="admin"):
+    """Create a new case using a template."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            current_time = datetime.now().isoformat()
+            cursor.execute(
+                """
+                INSERT INTO cases (template_id, data_json, created_at, updated_at, created_by)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (template_id, data_json, current_time, current_time, created_by),
+            )
+            conn.commit()
+            return True, cursor.lastrowid
+    except Exception as e:
+        print(f"Error creating case: {e}")
+        return False, str(e)
+
+
+def get_case(case_id):
+    """Get case by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM cases WHERE id = ?", (case_id,)
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        print(f"Error getting case {case_id}: {e}")
+        return None
+
+
+def list_cases(limit=100):
+    """List cases, newest first."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM cases ORDER BY created_at DESC LIMIT ?", (limit,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error listing cases: {e}")
+        return []
+
+
+def update_case(case_id, data_json):
+    """Update case data."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE cases
+                SET data_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (data_json, datetime.now().isoformat(), case_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error updating case {case_id}: {e}")
+        return False
+
+
+def delete_case(case_id):
+    """Delete a case."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting case {case_id}: {e}")
+        return False

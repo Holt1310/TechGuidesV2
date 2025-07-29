@@ -27,4 +27,21 @@ Open `http://localhost:5000` in your browser (or the host/port you configure).
 Use the **Login** link to enter the admin password and create new posts. The
 default password can be set with the `TRUCKSOFT_ADMIN_PASSWORD` environment
 variable. The host and port may be customized with `TRUCKSOFT_HOST` and
+`TRUCKSOFT_PORT`.
 
+## Case Management
+
+Cases can be created from configurable templates. Admin users manage templates
+at `/admin/case-templates` while regular users create cases from `/cases`.
+Field options can reference custom data tables for automatic population.
+
+### Selenium Automation
+
+The `client_tools/case_creator.py` script demonstrates automated case creation
+using Selenium with Microsoft Edge WebDriver. Install the `selenium` package and
+place `msedgedriver.exe` in the `client_tools` folder. Configure your server URL
+and credentials in the script, then run:
+
+```bash
+python client_tools/case_creator.py
+```
