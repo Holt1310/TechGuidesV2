@@ -1,0 +1,14 @@
+[
+  {
+    "id": "default",
+    "name": "Default Template",
+    "fields": [
+      {"id": "title", "name": "Title", "type": "text", "required": true},
+      {"id": "description", "name": "Description", "type": "textarea"},
+      {"id": "status", "name": "Status", "type": "select", "options": [
+        {"value": "open", "label": "Open"},
+        {"value": "closed", "label": "Closed"}
+      ]}
+    ]
+  }
+]

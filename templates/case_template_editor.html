@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+{% from 'field_editor_macro.html' import field_editor %}
+
+{% block content %}
+<h2>{% if template %}Edit Template{% else %}New Template{% endif %}</h2>
+<form method="post" id="template-form">
+  <input type="hidden" name="field_count" id="field_count" value="{{ template.fields|length if template else 3 }}">
+  <div class="mb-3">
+    <label class="form-label">Template ID</label>
+    <input type="text" class="form-control" name="template_id" value="{{ template.id if template else '' }}" {% if template %}readonly{% endif %} required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Name</label>
+    <input type="text" class="form-control" name="name" value="{{ template.name if template else '' }}" required>
+  </div>
+  <div id="templateData" data-field-count="{{ template.fields|length if template else 3 }}" data-has-template="{{ 'true' if template else 'false' }}" data-fields='{{ template.fields|tojson if template else '' }}'></div>
+  <div id="fieldsContainer">
+    {% if template %}
+      {% for field in template.fields %}
+        {% include 'field_editor_macro.html' %}
+      {% endfor %}
+    {% else %}
+      {% for i in range(3) %}
+        {% set field = {} %}
+        {% include 'field_editor_macro.html' %}
+      {% endfor %}
+    {% endif %}
+  </div>
+  <button type="button" class="btn btn-secondary my-2" onclick="addField()">Add Field</button>
+  <button type="submit" class="btn btn-primary">Save Template</button>
+</form>
+<script src="{{ url_for('static', filename='js/template-editor.js') }}"></script>
+{% endblock %}

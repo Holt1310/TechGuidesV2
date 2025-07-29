@@ -73,6 +73,19 @@ def init_database():
                 UNIQUE(username, tool_id)
             )
         ''')
+
+        # Create cases table for case management
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                template_id TEXT NOT NULL,
+                data_json TEXT NOT NULL,
+                status TEXT DEFAULT 'Open',
+                created_at TEXT,
+                updated_at TEXT,
+                created_by TEXT
+            )
+        ''')
         
         conn.commit()
         conn.close()

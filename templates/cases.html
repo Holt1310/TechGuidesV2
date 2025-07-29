@@ -1,0 +1,32 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h2>Cases</h2>
+<a href="{{ url_for('new_case') }}" class="btn btn-primary mb-3">New Case</a>
+<form method="get" class="mb-3">
+  <input type="text" name="q" value="{{ request.args.get('q','') }}" class="form-control" placeholder="Search">
+</form>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Template</th>
+      <th>Created</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for case in cases %}
+    <tr>
+      <td>{{ case.id }}</td>
+      <td>{{ case.template_id }}</td>
+      <td>{{ case.created_at }}</td>
+      <td>
+        <a href="{{ url_for('edit_case', case_id=case.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+        <a href="{{ url_for('delete_case_view', case_id=case.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete case?');">Delete</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

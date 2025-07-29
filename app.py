@@ -34,6 +34,7 @@ UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
 CHATS_PATH = os.path.join(app.root_path, 'chat.json')
 ADMINS_PATH = os.path.join(app.root_path, 'admins.json')
 EXTERNAL_TOOLS_CONFIG_PATH = os.path.join(app.root_path, 'external_tools_config.json')
+CASE_TEMPLATES_PATH = os.path.join(app.root_path, 'case_templates.json')
 ALLOWED_ATTACH_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff', 'svg', 'txt', 'doc', 'docx', 'zip', 'rar', '7z'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -203,6 +204,21 @@ def save_external_tools_config(config):
     except Exception as e:
         print(f"Error saving external tools config: {e}")
         return False
+
+
+def load_case_templates():
+    """Load case templates from JSON file."""
+    if not os.path.exists(CASE_TEMPLATES_PATH):
+        return []
+    with open(CASE_TEMPLATES_PATH, "r", encoding='utf-8') as f:
+        return json.load(f)
+
+
+def save_case_templates(templates):
+    """Save case templates to JSON file."""
+    with open(CASE_TEMPLATES_PATH, "w", encoding='utf-8') as f:
+        json.dump(templates, f, indent=2, ensure_ascii=False)
+    return True
 
 
 
@@ -2041,6 +2057,175 @@ def manage_table_data(table_name):
                          pagination=pagination,
                          error=error,
                          success=success)
+
+
+# =====================
+# Case Management Routes
+# =====================
+
+@app.route('/cases')
+def list_cases_view():
+    """List all cases."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    search = request.args.get('q', '').lower()
+    try:
+        from db_utils import list_cases
+        cases = list_cases()
+    except Exception as e:
+        print(f"Error listing cases: {e}")
+        cases = []
+
+    if search:
+        cases = [c for c in cases if search in json.dumps(c.get('data', {})).lower()]
+
+    return render_template('cases.html', cases=cases)
+
+
+@app.route('/cases/new', methods=['GET', 'POST'])
+def new_case():
+    """Create a new case from a template."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    templates = load_case_templates()
+    template_id = request.args.get('template') or request.form.get('template_id')
+
+    template = next((t for t in templates if t['id'] == template_id), None)
+
+    if request.method == 'POST' and template:
+        data = {}
+        for f in template.get('fields', []):
+            value = request.form.get(f['id'], '')
+            if f.get('type') == 'checkbox':
+                value = 'on' if request.form.get(f['id']) else ''
+            data[f['id']] = value
+        try:
+            from db_utils import create_case
+            success, case_id = create_case(template_id, data, session.get('username', 'admin'))
+            if success:
+                return redirect(url_for('list_cases_view'))
+        except Exception as e:
+            print(f"Error creating case: {e}")
+
+    if not template:
+        return render_template('case_form.html', templates=templates, template=None)
+
+    return render_template('case_form.html', template=template, case=None)
+
+
+@app.route('/cases/<int:case_id>/edit', methods=['GET', 'POST'])
+def edit_case(case_id):
+    """Edit an existing case."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    from db_utils import get_case, update_case
+    case = get_case(case_id)
+    if not case:
+        return redirect(url_for('list_cases_view'))
+
+    templates = load_case_templates()
+    template = next((t for t in templates if t['id'] == case['template_id']), None)
+
+    if request.method == 'POST' and template:
+        data = {}
+        for f in template.get('fields', []):
+            value = request.form.get(f['id'], '')
+            if f.get('type') == 'checkbox':
+                value = 'on' if request.form.get(f['id']) else ''
+            data[f['id']] = value
+        update_case(case_id, data)
+        return redirect(url_for('list_cases_view'))
+
+    return render_template('case_form.html', template=template, case=case)
+
+
+@app.route('/cases/<int:case_id>/delete')
+def delete_case_view(case_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    from db_utils import delete_case
+    delete_case(case_id)
+    return redirect(url_for('list_cases_view'))
+
+
+# Case Template Management
+
+@app.route('/admin/case-templates')
+def manage_case_templates():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+
+    templates = load_case_templates()
+    return render_template('admin_case_templates.html', templates=templates)
+
+
+@app.route('/admin/case-templates/new', methods=['GET', 'POST'])
+def new_case_template():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+
+    templates = load_case_templates()
+    if request.method == 'POST':
+        template_id = request.form.get('template_id').strip()
+        name = request.form.get('name').strip()
+        fields = []
+        field_count = int(request.form.get('field_count', 0))
+        for i in range(field_count):
+            field_id = request.form.get(f'field_{i}_id', '').strip()
+            field_name = request.form.get(f'field_{i}_name', '').strip()
+            field_type = request.form.get(f'field_{i}_type', 'text')
+            required = bool(request.form.get(f'field_{i}_required'))
+            if field_id:
+                fields.append({'id': field_id, 'name': field_name, 'type': field_type, 'required': required})
+        templates.append({'id': template_id, 'name': name, 'fields': fields})
+        save_case_templates(templates)
+        return redirect(url_for('manage_case_templates'))
+
+    return render_template('case_template_editor.html', template=None)
+
+
+@app.route('/admin/case-templates/<template_id>', methods=['GET', 'POST'])
+def edit_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+
+    templates = load_case_templates()
+    template = next((t for t in templates if t['id'] == template_id), None)
+    if not template:
+        return redirect(url_for('manage_case_templates'))
+
+    if request.method == 'POST':
+        name = request.form.get('name').strip()
+        fields = []
+        field_count = int(request.form.get('field_count', 0))
+        for i in range(field_count):
+            field_id = request.form.get(f'field_{i}_id', '').strip()
+            field_name = request.form.get(f'field_{i}_name', '').strip()
+            field_type = request.form.get(f'field_{i}_type', 'text')
+            required = bool(request.form.get(f'field_{i}_required'))
+            if field_id:
+                fields.append({'id': field_id, 'name': field_name, 'type': field_type, 'required': required})
+        template['name'] = name
+        template['fields'] = fields
+        save_case_templates(templates)
+        return redirect(url_for('manage_case_templates'))
+
+    return render_template('case_template_editor.html', template=template)
+
+
+@app.route('/admin/case-templates/<template_id>/delete')
+def delete_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+
+    templates = load_case_templates()
+    templates = [t for t in templates if t['id'] != template_id]
+    save_case_templates(templates)
+    return redirect(url_for('manage_case_templates'))
 
 
 @app.route('/api/data-tables')

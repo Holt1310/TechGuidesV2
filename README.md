@@ -28,3 +28,18 @@ Use the **Login** link to enter the admin password and create new posts. The
 default password can be set with the `TRUCKSOFT_ADMIN_PASSWORD` environment
 variable. The host and port may be customized with `TRUCKSOFT_HOST` and
 
+
+## Selenium Automation
+
+The `client_tools/automate_case_creation.py` script demonstrates how to create a case automatically using Microsoft Edge WebDriver. Install the `selenium` package and download the appropriate Edge driver. Place `msedgedriver.exe` in the `client_tools` folder.
+
+Run the script with environment variables:
+
+```bash
+TECHGUIDES_URL=http://localhost:5151 \
+TECHGUIDES_USER=admin \
+TECHGUIDES_PASS=secret \
+CASE_TEMPLATE=default \
+CASE_DATA='{"title":"Auto Case","description":"Created by Selenium"}' \
+python client_tools/automate_case_creation.py
+```

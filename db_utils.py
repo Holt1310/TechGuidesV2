@@ -647,6 +647,98 @@ def get_custom_table_related_data(table_name, search_column, search_value, retur
         return None
 
 
+# =====================
+# Case Management Functions
+# =====================
+
+import json
+
+def create_case(template_id, data, created_by="admin"):
+    """Create a new case record."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            current_time = datetime.now().isoformat()
+            cursor.execute(
+                """
+                INSERT INTO cases (template_id, data_json, status, created_at, updated_at, created_by)
+                VALUES (?, ?, 'Open', ?, ?, ?)
+                """,
+                (template_id, json.dumps(data), current_time, current_time, created_by)
+            )
+            conn.commit()
+            return True, cursor.lastrowid
+    except Exception as e:
+        print(f"Error creating case: {e}")
+        return False, str(e)
+
+
+def get_case(case_id):
+    """Retrieve a case by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM cases WHERE id = ?", (case_id,))
+            row = cursor.fetchone()
+            if row:
+                case = dict(row)
+                case['data'] = json.loads(case['data_json']) if case.get('data_json') else {}
+                return case
+            return None
+    except Exception as e:
+        print(f"Error retrieving case {case_id}: {e}")
+        return None
+
+
+def list_cases(limit=100, offset=0):
+    """List cases with pagination."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM cases ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset)
+            )
+            cases = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                item['data'] = json.loads(item['data_json']) if item.get('data_json') else {}
+                cases.append(item)
+            return cases
+    except Exception as e:
+        print(f"Error listing cases: {e}")
+        return []
+
+
+def update_case(case_id, data):
+    """Update an existing case."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE cases SET data_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(data), datetime.now().isoformat(), case_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error updating case {case_id}: {e}")
+        return False
+
+
+def delete_case(case_id):
+    """Delete a case record."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting case {case_id}: {e}")
+        return False
+
+
 # User External Tools Management Functions
 
 def create_user_external_tool(username, tool_data):
