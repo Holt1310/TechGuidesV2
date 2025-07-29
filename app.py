@@ -10,27 +10,6 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'change-this-secret'
 
-def parse_json_or_form(req):
-    """
-    Return a tuple of (data_dict, is_json).
-    Tries JSON first; falls back to form data.
-    """
-    data = req.get_json(silent=True)
-    if isinstance(data, dict):
-        return data, True
-    return req.form.to_dict(), False
-# Add custom Jinja filters
-
-@app.template_filter('from_json')
-def from_json_filter(value):
-    """Convert JSON string to Python object"""
-    if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except (json.JSONDecodeError, TypeError):
-            return {}
-    return value or {}
-
 # Global client service queue (in production, use Redis or database)
 CLIENT_SERVICE_QUEUE = {}
 
@@ -50,21 +29,10 @@ try:
     
     # Initialize enhanced database
     from enhanced_database_init import init_enhanced_database, create_sample_data_tables, create_form_builder_configs
-    import time
     print("Initializing enhanced database...")
     if init_enhanced_database():
-        try:
-            time.sleep(0.1)  # Small delay to ensure connection is closed
-            create_sample_data_tables()
-        except Exception as e:
-            print(f"Error creating sample data tables: {e}")
-        
-        try:
-            time.sleep(0.1)  # Small delay to ensure connection is closed
-            create_form_builder_configs()
-        except Exception as e:
-            print(f"Error creating form builder configs: {e}")
-        
+        create_sample_data_tables()
+        create_form_builder_configs()
         print("Enhanced database initialized successfully!")
 except Exception as e:
     print(f"Database initialization error: {e}")
@@ -1011,7 +979,7 @@ def manage_post_tags(index):
     
     elif request.method == 'POST':
         # Add a new tag or set all tags
-        data = request.get_json(silent=True) or {}
+        data = request.get_json() or {}
         
         if 'tag' in data:
             # Add a single tag
@@ -1035,7 +1003,7 @@ def manage_post_tags(index):
     
     elif request.method == 'DELETE':
         # Remove a specific tag
-        data = request.get_json(silent=True) or {}
+        data = request.get_json() or {}
         tag_to_remove = data.get('tag', '').strip()
         
         if tag_to_remove and tag_to_remove in post.get('tags', []):
@@ -1322,7 +1290,7 @@ def manage_post_annotations(index):
     
     elif request.method == 'POST':
         # Add a new annotation
-        data = request.get_json(silent=True) or {}
+        data = request.get_json() or {}
         
         if 'annotation' in data:
             annotation_id = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
@@ -1348,7 +1316,7 @@ def manage_post_annotations(index):
         if not session.get('logged_in'):
             return jsonify({'error': 'Not authenticated'}), 401
             
-        data = request.get_json(silent=True) or {}
+        data = request.get_json() or {}
         annotation_id = data.get('annotation_id', '')
         
         if annotation_id:
@@ -1472,9 +1440,9 @@ def run_external_tool():
         return jsonify({'success': False, 'error': 'External tools not enabled'}), 403
     
     try:
-        payload, is_json = parse_json_or_form(request)
-        # Accept both camelCase and snake_case
-        tool_id = payload.get('tool_id') or payload.get('toolId')
+        data = request.get_json()
+        tool_id = data.get('toolId')
+        
         if not tool_id:
             return jsonify({'success': False, 'error': 'Tool ID required'}), 400
         
@@ -1630,10 +1598,12 @@ def client_service_queue():
             })
             
         elif request.method == 'POST':
-            payload, is_json = parse_json_or_form(request)
-            action = payload.get('action', 'add')
+            # Add task to queue or mark task as completed
+            data = request.get_json()
+            action = data.get('action', 'add')
+            
             if action == 'add':
-                tool_id = payload.get('tool_id') or payload.get('toolId')
+                tool_id = data.get('tool_id')
                 if not tool_id:
                     return jsonify({'success': False, 'error': 'Tool ID required'}), 400
                 
@@ -1659,7 +1629,7 @@ def client_service_queue():
                 })
                 
             elif action == 'complete':
-                task_id = payload.get('task_id')
+                task_id = data.get('task_id')
                 if not task_id:
                     return jsonify({'success': False, 'error': 'Task ID required'}), 400
                 
@@ -1903,94 +1873,55 @@ def manage_data_tables():
     success = None
     
     if request.method == 'POST':
-        # Handle both JSON and form data
-        if request.content_type and 'application/json' in request.content_type:
-            # Handle JSON request
-            data = data = request.get_json(silent=True) or {}
-            action = data.get('action', '')
+        action = request.form.get('action', '')
+        
+        if action == 'create':
+            table_name = request.form.get('table_name', '').strip()
+            description = request.form.get('description', '').strip()
             
-            if action == 'create':
-                table_name = data.get('table_name', '').strip()
-                description = data.get('description', '').strip()
-                columns = data.get('columns', [])
-                
-                if table_name and columns:
-                    try:
-                        from db_utils import create_custom_table
-                        success_flag, message = create_custom_table(table_name, columns, description)
-                        if success_flag:
-                            return jsonify({'success': True, 'message': message})
-                        else:
-                            return jsonify({'success': False, 'message': message}), 400
-                    except Exception as e:
-                        return jsonify({'success': False, 'message': f"Error creating table: {str(e)}"}), 500
-                else:
-                    return jsonify({'success': False, 'message': "Table name and at least one column are required"}), 400
-                    
-            elif action == 'delete':
-                table_name = data.get('table_name', '').strip()
-                if table_name:
-                    try:
-                        from db_utils import delete_custom_table
-                        success_flag, message = delete_custom_table(table_name)
-                        if success_flag:
-                            return jsonify({'success': True, 'message': message})
-                        else:
-                            return jsonify({'success': False, 'message': message}), 400
-                    except Exception as e:
-                        return jsonify({'success': False, 'message': f"Error deleting table: {str(e)}"}), 500
-                        
-        else:
-            # Handle form submission (existing code)
-            action = request.form.get('action', '')
+            # Parse columns from form
+            columns = []
+            column_count = int(request.form.get('column_count', 0))
             
-            if action == 'create':
-                table_name = request.form.get('table_name', '').strip()
-                description = request.form.get('description', '').strip()
+            for i in range(column_count):
+                col_name = request.form.get(f'column_{i}_name', '').strip()
+                col_type = request.form.get(f'column_{i}_type', 'string')
+                col_required = bool(request.form.get(f'column_{i}_required'))
+                col_unique = bool(request.form.get(f'column_{i}_unique'))
                 
-                # Parse columns from form
-                columns = []
-                column_count = int(request.form.get('column_count', 0))
+                if col_name:
+                    columns.append({
+                        'name': col_name,
+                        'type': col_type,
+                        'required': col_required,
+                        'unique': col_unique
+                    })
+            
+            if table_name and columns:
+                try:
+                    from db_utils import create_custom_table
+                    success_flag, message = create_custom_table(table_name, columns, description)
+                    if success_flag:
+                        success = message
+                    else:
+                        error = message
+                except Exception as e:
+                    error = f"Error creating table: {str(e)}"
+            else:
+                error = "Table name and at least one column are required"
                 
-                for i in range(column_count):
-                    col_name = request.form.get(f'column_{i}_name', '').strip()
-                    col_type = request.form.get(f'column_{i}_type', 'string')
-                    col_required = bool(request.form.get(f'column_{i}_required'))
-                    col_unique = bool(request.form.get(f'column_{i}_unique'))
-                    
-                    if col_name:
-                        columns.append({
-                            'name': col_name,
-                            'type': col_type,
-                            'required': col_required,
-                            'unique': col_unique
-                        })
-                
-                if table_name and columns:
-                    try:
-                        from db_utils import create_custom_table
-                        success_flag, message = create_custom_table(table_name, columns, description)
-                        if success_flag:
-                            success = f"Table '{table_name}' created successfully."
-                        else:
-                            error = message
-                    except Exception as e:
-                        error = f"Error creating table: {e}"
-                else:
-                    error = "Table name and columns are required."
-                    
-            elif action == 'delete':
-                table_name = request.form.get('table_name', '').strip()
-                if table_name:
-                    try:
-                        from db_utils import delete_custom_table
-                        success_flag, message = delete_custom_table(table_name)
-                        if success_flag:
-                            success = message
-                        else:
-                            error = message
-                    except Exception as e:
-                        error = f"Error deleting table: {str(e)}"
+        elif action == 'delete':
+            table_name = request.form.get('table_name', '').strip()
+            if table_name:
+                try:
+                    from db_utils import delete_custom_table
+                    success_flag, message = delete_custom_table(table_name)
+                    if success_flag:
+                        success = message
+                    else:
+                        error = message
+                except Exception as e:
+                    error = f"Error deleting table: {str(e)}"
     
     # Load existing tables
     try:
@@ -2124,6 +2055,148 @@ def manage_table_data(table_name):
                          success=success)
 
 
+# ---------------------------------------------------------------------------
+# Case Templates Management
+# ---------------------------------------------------------------------------
+
+@app.route('/admin/case-templates')
+def case_templates():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    try:
+        from db_utils import get_case_templates
+        templates = get_case_templates()
+    except Exception as e:
+        print(f"Error loading case templates: {e}")
+        templates = []
+    return render_template('admin_case_templates.html', templates=templates)
+
+
+@app.route('/admin/case-templates/new', methods=['GET', 'POST'])
+def new_case_template():
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    error = None
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        fields_json = request.form.get('fields', '[]')
+        rules_json = request.form.get('rules', '[]')
+        try:
+            fields = json.loads(fields_json)
+            rules = json.loads(rules_json) if rules_json else []
+            from db_utils import create_case_template
+            create_case_template(name, description, fields, rules, session.get('username', 'admin'))
+            return redirect(url_for('case_templates'))
+        except Exception as e:
+            error = f"Error saving template: {e}"
+    return render_template('case_template_form.html', template=None, error=error)
+
+
+@app.route('/admin/case-templates/<int:template_id>/edit', methods=['GET', 'POST'])
+def edit_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    error = None
+    from db_utils import get_case_template, update_case_template
+    template = get_case_template(template_id)
+    if not template:
+        return redirect(url_for('case_templates'))
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        fields_json = request.form.get('fields', '[]')
+        rules_json = request.form.get('rules', '[]')
+        try:
+            fields = json.loads(fields_json)
+            rules = json.loads(rules_json) if rules_json else []
+            update_case_template(template_id, name, description, fields, rules)
+            return redirect(url_for('case_templates'))
+        except Exception as e:
+            error = f"Error updating template: {e}"
+    return render_template('case_template_form.html', template=template, error=error)
+
+
+@app.route('/admin/case-templates/<int:template_id>/delete', methods=['POST'])
+def delete_case_template(template_id):
+    if not session.get('logged_in') or not session.get('secret_admin'):
+        return redirect(url_for('login'))
+    from db_utils import delete_case_template
+    delete_case_template(template_id)
+    return redirect(url_for('case_templates'))
+
+
+# ---------------------------------------------------------------------------
+# Cases CRUD
+# ---------------------------------------------------------------------------
+
+@app.route('/cases')
+def cases():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    search = request.args.get('search', '').lower()
+    template_filter = request.args.get('template', 'all')
+    from db_utils import get_all_cases, get_case_templates
+    cases = get_all_cases()
+    templates = get_case_templates()
+    filtered = []
+    for c in cases:
+        if template_filter != 'all' and str(c['template_id']) != template_filter:
+            continue
+        if search and search not in json.dumps(c['case_data']).lower():
+            continue
+        filtered.append(c)
+    return render_template('cases.html', cases=filtered, templates=templates, search=search, template_filter=template_filter)
+
+
+@app.route('/cases/new', methods=['GET', 'POST'])
+def new_case():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    template_id = request.args.get('template_id') or request.form.get('template_id')
+    from db_utils import get_case_templates, get_case_template, create_case
+    if not template_id:
+        templates = get_case_templates()
+        if not templates:
+            return redirect(url_for('case_templates'))
+        template_id = templates[0]['id']
+    template = get_case_template(int(template_id))
+    if not template:
+        return redirect(url_for('case_templates'))
+    if request.method == 'POST':
+        case_data = {f['id']: request.form.get(f['id'], '') for f in template['fields']}
+        create_case(template['id'], case_data, session.get('username', 'admin'))
+        return redirect(url_for('cases'))
+    return render_template('case_form.html', template=template, case=None)
+
+
+@app.route('/cases/edit/<int:case_id>', methods=['GET', 'POST'])
+def edit_case(case_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    from db_utils import get_case, get_case_template, update_case
+    case = get_case(case_id)
+    if not case:
+        return redirect(url_for('cases'))
+    template = get_case_template(case['template_id'])
+    if not template:
+        return redirect(url_for('cases'))
+    if request.method == 'POST':
+        case_data = {f['id']: request.form.get(f['id'], '') for f in template['fields']}
+        update_case(case_id, case_data)
+        return redirect(url_for('cases'))
+    return render_template('case_form.html', template=template, case=case)
+
+
+@app.route('/cases/delete/<int:case_id>', methods=['POST'])
+def delete_case(case_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    from db_utils import delete_case
+    delete_case(case_id)
+    return redirect(url_for('cases'))
+
+
 @app.route('/api/data-tables')
 def api_get_data_tables():
     """API endpoint to get list of custom data tables for other integrations."""
@@ -2198,8 +2271,8 @@ def api_get_related_data(table_name):
     except Exception as e:
         print(f"Error getting related data for {table_name}: {e}")
         return jsonify({'error': 'Failed to get related data'}), 500
-    
-    
+
+
 if __name__ == '__main__':
     # Automatically detect local IP address
     auto_ip = get_local_ip()

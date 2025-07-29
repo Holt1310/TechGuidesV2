@@ -9,7 +9,6 @@ class EnhancedTemplateEditor {
         this.currentFieldType = null;
         this.editingFieldIndex = -1;
         this.dataTables = [];
-        this.templateId = null;
         
         this.initializeEventListeners();
         this.initializeSortable();
@@ -142,9 +141,40 @@ class EnhancedTemplateEditor {
             case 'multiselect':
             case 'radio':
             case 'checkbox':
+                configContainer.innerHTML = `
+                    <div class="mb-3">
+                        <label class="form-label">Options</label>
+                        <div id="optionsContainer">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control option-value" placeholder="Option value">
+                                <input type="text" class="form-control option-label" placeholder="Option label">
+                                <button class="btn btn-outline-danger" type="button" onclick="this.closest('.input-group').remove()">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="this.addOption()">
+                            <i class="bi bi-plus"></i> Add Option
+                        </button>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="allowOther">
+                        <label class="form-check-label" for="allowOther">Allow "Other" option</label>
+                    </div>
+                `;
+                break;
+                
+            case 'data_table_lookup':
+                this.configureDataTableLookup(configContainer);
+                break;
+                
+            case 'dependent_field':
+                this.configureDependentField(configContainer);
+                break;
+                
             case 'autocomplete':
-                const extraConfig = fieldType === 'autocomplete' ? `
-                    <div class="row mt-3">
+                configContainer.innerHTML = `
+                    <div class="row">
                         <div class="col-md-6">
                             <label class="form-label">Minimum Search Length</label>
                             <input type="number" class="form-control" id="minSearchLength" value="1" min="1">
@@ -159,50 +189,8 @@ class EnhancedTemplateEditor {
                             <input class="form-check-input" type="checkbox" id="allowCustom" checked>
                             <label class="form-check-label" for="allowCustom">Allow custom values</label>
                         </div>
-                    </div>` : `
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="allowOther">
-                        <label class="form-check-label" for="allowOther">Allow "Other" option</label>
-                    </div>`;
-
-                configContainer.innerHTML = `
-                    <div class="mb-3">
-                        <label class="form-label">Options Source</label>
-                        <select class="form-select" id="optionSource">
-                            <option value="static" selected>Static Options</option>
-                            <option value="table">Data Table</option>
-                        </select>
                     </div>
-                    <div id="staticOptionsSection">
-                        <div class="mb-3">
-                            <label class="form-label">Options</label>
-                            <div id="optionsContainer">
-                                <div class="input-group mb-2">
-                                    <input type="text" class="form-control option-value" placeholder="Option value">
-                                    <input type="text" class="form-control option-label" placeholder="Option label">
-                                    <button class="btn btn-outline-danger" type="button" onclick="this.closest('.input-group').remove()">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="this.addOption()">
-                                <i class="bi bi-plus"></i> Add Option
-                            </button>
-                        </div>
-                        ${extraConfig}
-                    </div>
-                    <div id="tableOptionsSection" style="display:none;"></div>
                 `;
-                this.configureDataTableLookup(document.getElementById('tableOptionsSection'));
-                document.getElementById('optionSource').addEventListener('change', e => {
-                    document.getElementById('staticOptionsSection').style.display = e.target.value === 'static' ? 'block' : 'none';
-                    document.getElementById('tableOptionsSection').style.display = e.target.value === 'table' ? 'block' : 'none';
-                });
-                break;
-                
-                
-            case 'dependent_field':
-                this.configureDependentField(configContainer);
                 break;
                 
             case 'date':
@@ -274,15 +262,14 @@ class EnhancedTemplateEditor {
                 <h6><i class="bi bi-table"></i> Data Table Configuration</h6>
                 <div class="mb-3">
                     <label class="form-label">Select Data Table</label>
-                    <select class="form-select" id="dataTableSelect" onchange="templateEditor.loadTableColumns()">
+                    <select class="form-select" id="dataTableSelect">
                         <option value="">Select a data table...</option>
                     </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Column</label>
-                    <select class="form-select" id="dataColumnSelect">
-                        <option value="">Select column...</option>
-                    </select>
+                    <div class="form-text">
+                        <button type="button" class="btn btn-link btn-sm p-0" onclick="this.openDataTableModal()">
+                            View available data tables
+                        </button>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
@@ -474,28 +461,17 @@ class EnhancedTemplateEditor {
             case 'multiselect':
             case 'radio':
             case 'checkbox':
-            case 'autocomplete': {
-                const source = document.getElementById('optionSource')?.value || 'static';
-                fieldData.config.source = source;
-                if (source === 'static') {
-                    fieldData.config.options = this.collectOptions();
-                    if (fieldData.field_type === 'autocomplete') {
-                        fieldData.config.allowCustom = document.getElementById('allowCustom')?.checked || false;
-                        fieldData.config.minSearchLength = parseInt(document.getElementById('minSearchLength')?.value) || 1;
-                        fieldData.config.maxResults = parseInt(document.getElementById('maxResults')?.value) || 10;
-                    } else {
-                        fieldData.config.allowOther = document.getElementById('allowOther')?.checked || false;
-                    }
-                } else {
-                    fieldData.data_table_id = document.getElementById('dataTableSelect')?.value || '';
-                    fieldData.config.dataColumn = document.getElementById('dataColumnSelect')?.value || '';
-                    fieldData.config.searchable = document.getElementById('searchable')?.checked || true;
-                    fieldData.config.multiSelect = document.getElementById('multiSelect')?.checked || false;
-                    fieldData.config.minSearchLength = parseInt(document.getElementById('minSearchLength')?.value) || 1;
-                    fieldData.config.maxResults = parseInt(document.getElementById('maxResults')?.value) || 10;
-                }
+                fieldData.config.options = this.collectOptions();
+                fieldData.config.allowOther = document.getElementById('allowOther')?.checked || false;
                 break;
-            }
+                
+            case 'data_table_lookup':
+                fieldData.config.dataTableId = document.getElementById('dataTableSelect')?.value || '';
+                fieldData.config.searchable = document.getElementById('searchable')?.checked || true;
+                fieldData.config.multiSelect = document.getElementById('multiSelect')?.checked || false;
+                fieldData.config.minSearchLength = parseInt(document.getElementById('minSearchLength')?.value) || 2;
+                fieldData.config.maxResults = parseInt(document.getElementById('maxResults')?.value) || 10;
+                break;
                 
             case 'dependent_field':
                 fieldData.config.dependsOn = document.getElementById('parentField')?.value || '';
@@ -676,6 +652,12 @@ class EnhancedTemplateEditor {
                 });
                 break;
                 
+            case 'data_table_lookup':
+                preview += '<select class="form-select" disabled>';
+                preview += '<option>Search data table...</option>';
+                preview += '</select>';
+                preview += `<small class="text-muted">Connected to data table: ${field.config.dataTableId || 'Not selected'}</small>`;
+                break;
                 
             case 'dependent_field':
                 preview += '<select class="form-select" disabled>';
@@ -710,6 +692,7 @@ class EnhancedTemplateEditor {
             'multiselect': 'bi-menu-button-wide',
             'radio': 'bi-record-circle',
             'checkbox': 'bi-check-square',
+            'data_table_lookup': 'bi-table',
             'dependent_field': 'bi-diagram-3',
             'autocomplete': 'bi-search',
             'date': 'bi-calendar-date',
@@ -729,6 +712,7 @@ class EnhancedTemplateEditor {
             'multiselect': 'Multi-Select',
             'radio': 'Radio Buttons',
             'checkbox': 'Checkboxes',
+            'data_table_lookup': 'Data Lookup',
             'dependent_field': 'Dependent Field',
             'autocomplete': 'Autocomplete',
             'date': 'Date Picker',
@@ -836,69 +820,12 @@ class EnhancedTemplateEditor {
     }
     
     loadDataTables() {
-        fetch('/enhanced/api/data-tables')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    this.dataTables = data.tables;
-                } else {
-                    this.dataTables = [];
-                }
-                this.populateDataTableSelect();
-            })
-            .catch(() => {
-                this.dataTables = [];
-            });
-    }
-
-    loadTableColumns() {
-        const tableId = document.getElementById('dataTableSelect')?.value;
-        const columnSelect = document.getElementById('dataColumnSelect');
-        if (!tableId || !columnSelect) return;
-        fetch(`/enhanced/api/data-tables/${tableId}/columns`)
-            .then(r => r.json())
-            .then(data => {
-                columnSelect.innerHTML = '<option value="">Select column...</option>';
-                if (data.success) {
-                    data.columns.forEach(col => {
-                        const opt = document.createElement('option');
-                        opt.value = col.column_name;
-                        opt.textContent = col.display_name || col.column_name;
-                        columnSelect.appendChild(opt);
-                    });
-                }
-            })
-            .catch(() => {
-                columnSelect.innerHTML = '<option value="">Select column...</option>';
-            });
-    }
-
-    loadExistingTemplate(data) {
-        if (!data) return;
-        this.templateId = data.template.id;
-        document.getElementById('templateName').value = data.template.name || '';
-        document.getElementById('templateDescription').value = data.template.description || '';
-        document.getElementById('templateCategory').value = data.template.category || 'General';
-
-        this.fields = data.fields.map(f => ({
-            field_id: f.field_id,
-            field_name: f.field_name,
-            field_type: f.field_type,
-            is_required: f.is_required,
-            config: JSON.parse(f.field_config || '{}'),
-            validation_rules: JSON.parse(f.validation_rules || '{}'),
-            dependencies: (data.dependencies && data.dependencies[f.id]) ? data.dependencies[f.id].map(d => ({
-                parent_field_id: d.parent_field_id,
-                condition_type: d.condition_type,
-                condition_value: d.condition_value,
-                action_type: d.action_type,
-                action_config: JSON.parse(d.action_config || '{}')
-            })) : []
-        }));
-
-        this.updateFieldsList();
-        this.updatePreview();
-        this.updateStatistics();
+        // This would load data tables from the server
+        // For now, using mock data
+        this.dataTables = [
+            { id: 1, table_name: 'departments', display_name: 'Departments', record_count: 4 },
+            { id: 2, table_name: 'categories', display_name: 'Issue Categories', record_count: 8 }
+        ];
     }
     
     saveTemplate() {
@@ -919,11 +846,9 @@ class EnhancedTemplateEditor {
             return;
         }
         
-        const url = this.templateId ? `/enhanced/api/templates/${this.templateId}/update` : '/enhanced/api/templates/create';
-        const method = this.templateId ? 'PUT' : 'POST';
-
-        fetch(url, {
-            method: method,
+        // Send to server
+        fetch('/api/templates/create', {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -932,9 +857,6 @@ class EnhancedTemplateEditor {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                if (data.template_id) {
-                    this.templateId = data.template_id;
-                }
                 alert('Template saved successfully!');
             } else {
                 alert('Error saving template: ' + data.message);
@@ -1012,10 +934,6 @@ class EnhancedTemplateEditor {
 let templateEditor;
 document.addEventListener('DOMContentLoaded', function() {
     templateEditor = new EnhancedTemplateEditor();
-
-    if (window.existingTemplate) {
-        templateEditor.loadExistingTemplate(window.existingTemplate);
-    }
     
     // Make some methods globally accessible for onclick handlers
     window.addOption = templateEditor.addOption.bind(templateEditor);
