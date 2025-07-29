@@ -185,6 +185,76 @@ def get_data_table_columns(table_id):
         return [], f"Error retrieving columns: {str(e)}"
 
 
+def get_data_table_details(table_id):
+    """Get details for a single data table, including its columns."""
+    try:
+        with get_enhanced_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get table metadata
+            cursor.execute(
+                "SELECT id, table_name, display_name, description FROM data_tables WHERE id = ?",
+                (table_id,),
+            )
+            table_details = cursor.fetchone()
+
+            if not table_details:
+                return None, "Table not found"
+
+            # Get table columns
+            cursor.execute(
+                "SELECT id, column_name, display_name, data_type FROM data_table_columns WHERE table_id = ? ORDER BY id",
+                (table_id,),
+            )
+            columns = cursor.fetchall()
+
+            result = {
+                "details": dict(table_details),
+                "columns": [dict(col) for col in columns],
+            }
+            return result, "Details retrieved successfully"
+
+    except Exception as e:
+        return None, f"Error getting data table details: {str(e)}"
+
+
+def get_all_records_for_table(table_id):
+    """Get all records for a specific data table."""
+    try:
+        with get_enhanced_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, record_data, created_at, created_by FROM data_table_records WHERE table_id = ? AND is_active = 1 ORDER BY created_at DESC",
+                (table_id,),
+            )
+            records = cursor.fetchall()
+
+            # The record_data is stored as a JSON string, so we parse it.
+            parsed_records = []
+            for record in records:
+                rec_dict = dict(record)
+                rec_dict["record_data"] = json.loads(rec_dict["record_data"])
+                parsed_records.append(rec_dict)
+
+            return parsed_records, "Records retrieved successfully"
+    except Exception as e:
+        return [], f"Error getting records for table: {str(e)}"
+
+
+def delete_data_table_record(record_id):
+    """Deletes a record from a data table by setting its is_active flag to 0."""
+    try:
+        with get_enhanced_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE data_table_records SET is_active = 0 WHERE id = ?", (record_id,)
+            )
+            conn.commit()
+            return True, "Record deleted successfully."
+    except Exception as e:
+        return False, f"Error deleting record: {str(e)}"
+
+
 # Enhanced Template Management
 
 

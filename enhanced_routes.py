@@ -1,6 +1,14 @@
 """
 Enhanced case management routes for the Flask application.
 Handles template creation, case management, and data table operations.
+
+This version has been refactored to gracefully handle both JSON and form
+payloads without throwing a 415 Unsupported Media Type error.  A helper
+function `parse_json_or_form` attempts to parse JSON silently and falls
+back to form data when the request’s `Content‑Type` is not
+`application/json`.  All API endpoints that previously called
+`request.get_json()` now use this helper or call `get_json` with
+`silent=True` to avoid raising exceptions.
 """
 
 from flask import (
@@ -13,6 +21,7 @@ from flask import (
     url_for,
 )
 import json
+import re
 from enhanced_db_utils import (
     create_enhanced_template,
     get_template_with_fields,
@@ -31,7 +40,23 @@ from enhanced_db_utils import (
     delete_data_table,
     update_data_table,
     create_data_table,
+    get_data_table_details,  # Added for viewing table details
+    get_all_records_for_table  # Added for retrieving table records
 )
+
+# Helper to parse request data
+def parse_json_or_form(req):
+    """Return (data_dict, is_json).  Attempts to parse JSON silently and
+    falls back to form data if the request content type isn’t JSON.
+
+    :param req: Flask request object
+    :return: tuple of (data_dict, is_json)
+    """
+    data = req.get_json(silent=True)
+    if data is not None:
+        return data, True
+    return req.form.to_dict(), False
+
 
 enhanced_bp = Blueprint("enhanced", __name__, url_prefix="/enhanced")
 
@@ -45,7 +70,7 @@ def template_builder():
     return render_template("enhanced_template_editor.html")
 
 
-@enhanced_bp.route("/template/<int:template_id>/preview")
+@enhanced_bp.route("/template/ /preview")
 def preview_template(template_id):
     """Preview a template with its fields displayed read-only."""
     if "username" not in session:
@@ -58,7 +83,7 @@ def preview_template(template_id):
     return render_template("enhanced_template_preview.html", template=template_data)
 
 
-@enhanced_bp.route("/template/<int:template_id>/edit")
+@enhanced_bp.route("/template/ /edit")
 def edit_template(template_id):
     """Edit an existing template using the builder."""
     if "username" not in session:
@@ -115,20 +140,19 @@ def cases_list():
     )
 
 
-@enhanced_bp.route("/case/<int:case_id>")
+@enhanced_bp.route("/case/ ")
 def view_case(case_id):
     """View a specific case."""
     if "username" not in session:
         return redirect(url_for("login"))
 
-    # Get case details
-    # This would need to be implemented
+    # Get case details (to be implemented)
     case_data = {}
 
     return render_template("enhanced_case_view.html", case=case_data)
 
 
-@enhanced_bp.route("/case/new/<int:template_id>")
+@enhanced_bp.route("/case/new/ ")
 def new_case(template_id):
     """Create a new case from a template."""
     if "username" not in session:
@@ -157,6 +181,41 @@ def data_tables():
     return render_template("enhanced_data_tables.html", tables=tables)
 
 
+@enhanced_bp.route("/data-tables/<int:table_id>/view")
+def data_table_view(table_id):
+    """View a specific data table and its records."""
+    if "username" not in session:
+        return redirect(url_for("login"))
+    table_data, message = get_data_table_details(table_id)
+    if not table_data:
+        return message, 404
+    records, msg = get_all_records_for_table(table_id)
+    return render_template(
+        "enhanced_data_table_view.html",
+        table_info=table_data["details"],
+        columns=table_data["columns"],
+        records=records
+    )
+
+
+@enhanced_bp.route("/data-tables/<int:table_id>/edit", methods=["GET", "POST"])
+def data_table_edit(table_id):
+    """Edit a specific data table schema (coming soon)."""
+    if "username" not in session:
+        return redirect(url_for("login"))
+    table_data, message = get_data_table_details(table_id)
+    if not table_data:
+        return message, 404
+    if request.method == "POST":
+        # TODO: Handle update logic
+        return redirect(url_for("enhanced.data_tables"))
+    return render_template(
+        "enhanced_data_table_edit.html",
+        table_info=table_data["details"],
+        columns=table_data["columns"]
+    )
+
+
 # API Routes
 
 
@@ -167,7 +226,7 @@ def api_create_template():
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
     try:
-        data = request.get_json()
+        data, _ = parse_json_or_form(request)
 
         if not data.get("name") or not data.get("fields"):
             return (
@@ -198,7 +257,7 @@ def api_create_template():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-@enhanced_bp.route("/api/templates/<int:template_id>")
+@enhanced_bp.route("/api/templates/ ")
 def api_get_template(template_id):
     """API endpoint to get template details."""
     if "username" not in session:
@@ -212,7 +271,7 @@ def api_get_template(template_id):
         return jsonify({"success": False, "message": message}), 404
 
 
-@enhanced_bp.route("/api/templates/<int:template_id>/delete", methods=["DELETE"])
+@enhanced_bp.route("/api/templates/ /delete", methods=["DELETE"])
 def api_delete_template(template_id):
     """API endpoint to delete a template."""
     if "username" not in session:
@@ -223,13 +282,13 @@ def api_delete_template(template_id):
     return jsonify({"success": success, "message": message}), status
 
 
-@enhanced_bp.route("/api/templates/<int:template_id>/update", methods=["PUT"])
+@enhanced_bp.route("/api/templates/ /update", methods=["PUT"])
 def api_update_template(template_id):
     """API endpoint to update an existing template."""
     if "username" not in session:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
-    data = request.get_json()
+    data, _ = parse_json_or_form(request)
     if not data or not data.get("name") or not data.get("fields"):
         return (
             jsonify({"success": False, "message": "Name and fields are required"}),
@@ -256,7 +315,7 @@ def api_create_case():
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
     try:
-        data = request.get_json()
+        data, _ = parse_json_or_form(request)
 
         template_id = data.get("template_id")
         title = data.get("title")
@@ -316,14 +375,14 @@ def api_create_case():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-@enhanced_bp.route("/api/cases/<int:case_id>/update-field", methods=["POST"])
+@enhanced_bp.route("/api/cases/ /update-field", methods=["POST"])
 def api_update_case_field(case_id):
     """API endpoint to update a specific field in a case."""
     if "username" not in session:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
     try:
-        data = request.get_json()
+        data, _ = parse_json_or_form(request)
 
         field_name = data.get("field_name")
         old_value = data.get("old_value")
@@ -367,31 +426,57 @@ def api_create_data_table():
         # Handle both JSON and form data
         if request.content_type and 'application/json' in request.content_type:
             # Handle JSON request
-            data = request.get_json()
-            table_name = data.get("table_name")
-            display_name = data.get("display_name") or data.get("table_name")  # Fallback to table_name
+            data = request.get_json(silent=True) or {}
+            # Support both snake_case and camelCase keys for table name and display name
+            table_name = data.get("table_name") or data.get("tableName")
+            display_name = (
+                data.get("display_name")
+                or data.get("displayName")
+                or table_name
+            )
             description = data.get("description", "")
             columns = data.get("columns", [])
         else:
             # Handle form data
-            form_data = request.form.to_dict()
-            table_name = form_data.get("table_name")
-            display_name = form_data.get("display_name") or form_data.get("table_name")  # Fallback to table_name
-            description = form_data.get("description", "")
+            table_name = request.form.get("table_name") or request.form.get("tableName")
+            display_name = request.form.get("display_name") or request.form.get("displayName") or table_name
+            description = request.form.get("description", "")
             
-            # Parse columns from form if it's a string
-            columns_str = form_data.get('columns', '[]')
-            if isinstance(columns_str, str):
-                try:
-                    columns = json.loads(columns_str)
-                except (json.JSONDecodeError, ValueError):
-                    columns = []
-            else:
-                columns = []
+            columns = []
+            i = 0
+            # Map form data types to database data types
+            data_type_map = {
+                'string': 'text',
+                'integer': 'number',
+                'decimal': 'number',
+                'boolean': 'boolean',
+                'date': 'date'
+            }
+
+            while True:
+                col_name_key = f'columns[{i}][name]'
+                if col_name_key not in request.form:
+                    break
+                
+                form_data_type = request.form.get(f'columns[{i}][type]', 'string')
+                db_data_type = data_type_map.get(form_data_type, 'text')
+
+                col = {
+                    'column_name': request.form.get(col_name_key),
+                    'display_name': request.form.get(f'columns[{i}][display_name]', request.form.get(col_name_key)),
+                    'data_type': db_data_type,
+                    'is_key_field': 1 if request.form.get(f'columns[{i}][required]') == 'on' else 0,
+                    'is_display_field': 1 if request.form.get(f'columns[{i}][unique]') == 'on' else 0,
+                    'is_searchable': 1,  # Default to searchable
+                    'validation_rules': {} 
+                }
+                columns.append(col)
+                i += 1
 
         print(f"Received table_name: {table_name}")
         print(f"Received columns: {columns}")
-        print(f"Raw payload received: {request.get_json()}")
+        # Only attempt to parse raw JSON silently to avoid raising 415
+        print(f"Raw payload received: {request.get_json(silent=True)}")
 
         if not table_name or not columns:
             return (
@@ -427,14 +512,14 @@ def api_create_data_table():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-@enhanced_bp.route("/api/data-tables/<int:table_id>/records", methods=["POST"])
+@enhanced_bp.route("/api/data-tables/ /records", methods=["POST"])
 def api_add_data_record(table_id):
     """API endpoint to add a record to a data table."""
     if "username" not in session:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         record_data = data.get("record_data", {})
 
         if not record_data:
@@ -462,7 +547,7 @@ def api_add_data_record(table_id):
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-@enhanced_bp.route("/api/data-tables/<int:table_id>/search")
+@enhanced_bp.route("/api/data-tables/ /search")
 def api_search_data_table(table_id):
     """API endpoint to search records in a data table."""
     if "username" not in session:
@@ -477,7 +562,7 @@ def api_search_data_table(table_id):
     return jsonify({"success": True, "results": results, "message": message})
 
 
-@enhanced_bp.route("/api/data-tables/<int:table_id>/columns")
+@enhanced_bp.route("/api/data-tables/ /columns")
 def api_get_table_columns(table_id):
     """API endpoint to retrieve data table columns."""
     if "username" not in session:
@@ -491,7 +576,7 @@ def api_get_table_columns(table_id):
     )
 
 
-@enhanced_bp.route("/api/data-tables/<int:table_id>", methods=["DELETE"])
+@enhanced_bp.route("/api/data-tables/ ", methods=["DELETE"])
 def api_delete_data_table(table_id):
     """API endpoint to delete a data table."""
     if "username" not in session:
@@ -502,13 +587,13 @@ def api_delete_data_table(table_id):
     return jsonify({"success": success, "message": message}), status
 
 
-@enhanced_bp.route("/api/data-tables/<int:table_id>", methods=["PUT"])
+@enhanced_bp.route("/api/data-tables/ ", methods=["PUT"])
 def api_update_data_table_route(table_id):
     """API endpoint to update a data table."""
     if "username" not in session:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     if not data:
         return jsonify({"success": False, "message": "No data provided"}), 400
 
@@ -525,7 +610,7 @@ def api_update_data_table_route(table_id):
     return jsonify({"success": success, "message": message}), status
 
 
-@enhanced_bp.route("/api/fields/<int:field_id>/options")
+@enhanced_bp.route("/api/fields/ /options")
 def api_get_field_options(field_id):
     """API endpoint to get dynamic options for a dependent field."""
     if "username" not in session:
@@ -538,14 +623,14 @@ def api_get_field_options(field_id):
     return jsonify({"success": True, "options": options, "message": message})
 
 
-@enhanced_bp.route("/api/templates/<int:template_id>/validate", methods=["POST"])
+@enhanced_bp.route("/api/templates/ /validate", methods=["POST"])
 def api_validate_template_data(template_id):
     """API endpoint to validate case data against template rules."""
     if "username" not in session:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         case_data = data.get("case_data", {})
 
         is_valid, validation_result = validate_field_dependencies(

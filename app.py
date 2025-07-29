@@ -10,7 +10,17 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'change-this-secret'
 
+def parse_json_or_form(req):
+    """
+    Return a tuple of (data_dict, is_json).
+    Tries JSON first; falls back to form data.
+    """
+    data = req.get_json(silent=True)
+    if isinstance(data, dict):
+        return data, True
+    return req.form.to_dict(), False
 # Add custom Jinja filters
+
 @app.template_filter('from_json')
 def from_json_filter(value):
     """Convert JSON string to Python object"""
@@ -1001,7 +1011,7 @@ def manage_post_tags(index):
     
     elif request.method == 'POST':
         # Add a new tag or set all tags
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         
         if 'tag' in data:
             # Add a single tag
@@ -1025,7 +1035,7 @@ def manage_post_tags(index):
     
     elif request.method == 'DELETE':
         # Remove a specific tag
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         tag_to_remove = data.get('tag', '').strip()
         
         if tag_to_remove and tag_to_remove in post.get('tags', []):
@@ -1312,7 +1322,7 @@ def manage_post_annotations(index):
     
     elif request.method == 'POST':
         # Add a new annotation
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         
         if 'annotation' in data:
             annotation_id = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
@@ -1338,7 +1348,7 @@ def manage_post_annotations(index):
         if not session.get('logged_in'):
             return jsonify({'error': 'Not authenticated'}), 401
             
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         annotation_id = data.get('annotation_id', '')
         
         if annotation_id:
@@ -1462,9 +1472,9 @@ def run_external_tool():
         return jsonify({'success': False, 'error': 'External tools not enabled'}), 403
     
     try:
-        data = request.get_json()
-        tool_id = data.get('toolId')
-        
+        payload, is_json = parse_json_or_form(request)
+        # Accept both camelCase and snake_case
+        tool_id = payload.get('tool_id') or payload.get('toolId')
         if not tool_id:
             return jsonify({'success': False, 'error': 'Tool ID required'}), 400
         
@@ -1620,12 +1630,10 @@ def client_service_queue():
             })
             
         elif request.method == 'POST':
-            # Add task to queue or mark task as completed
-            data = request.get_json()
-            action = data.get('action', 'add')
-            
+            payload, is_json = parse_json_or_form(request)
+            action = payload.get('action', 'add')
             if action == 'add':
-                tool_id = data.get('tool_id')
+                tool_id = payload.get('tool_id') or payload.get('toolId')
                 if not tool_id:
                     return jsonify({'success': False, 'error': 'Tool ID required'}), 400
                 
@@ -1651,7 +1659,7 @@ def client_service_queue():
                 })
                 
             elif action == 'complete':
-                task_id = data.get('task_id')
+                task_id = payload.get('task_id')
                 if not task_id:
                     return jsonify({'success': False, 'error': 'Task ID required'}), 400
                 
@@ -1898,7 +1906,7 @@ def manage_data_tables():
         # Handle both JSON and form data
         if request.content_type and 'application/json' in request.content_type:
             # Handle JSON request
-            data = request.get_json()
+            data = data = request.get_json(silent=True) or {}
             action = data.get('action', '')
             
             if action == 'create':
