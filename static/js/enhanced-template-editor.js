@@ -847,7 +847,7 @@ class EnhancedTemplateEditor {
         }
         
         // Send to server
-        fetch('/api/templates/create', {
+        fetch('/enhanced/api/templates/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
