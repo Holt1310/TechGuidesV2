@@ -1462,7 +1462,7 @@ def run_external_tool():
         return jsonify({'success': False, 'error': 'External tools not enabled'}), 403
     
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or request.form.to_dict()
         tool_id = data.get('toolId')
         
         if not tool_id:
@@ -1621,7 +1621,7 @@ def client_service_queue():
             
         elif request.method == 'POST':
             # Add task to queue or mark task as completed
-            data = request.get_json()
+            data = request.get_json(silent=True) or request.form.to_dict()
             action = data.get('action', 'add')
             
             if action == 'add':
@@ -1999,7 +1999,7 @@ def manage_data_tables():
                          success=success)
 
 
-@app.route('/admin/data-tables/<table_name>', methods=['GET', 'POST'])
+@app.route('/admin/data-tables/<string:table_name>', methods=['GET', 'POST'])
 def manage_table_data(table_name):
     """Interface for managing data in a specific custom table."""
     if not session.get('logged_in') or not session.get('secret_admin'):
@@ -2148,7 +2148,7 @@ def api_get_data_tables():
         return jsonify({'error': 'Failed to load tables'}), 500
 
 
-@app.route('/api/data-tables/<table_name>/data')
+@app.route('/api/data-tables/<string:table_name>/data')
 def api_get_table_data(table_name):
     """API endpoint to get data from a specific custom table."""
     if not session.get('logged_in'):
@@ -2171,7 +2171,7 @@ def api_get_table_data(table_name):
         return jsonify({'error': 'Failed to load table data'}), 500
 
 
-@app.route('/api/data-tables/<table_name>/related')
+@app.route('/api/data-tables/<string:table_name>/related')
 def api_get_related_data(table_name):
     """Return a single row from a table matching a column value."""
     if not session.get('logged_in'):
