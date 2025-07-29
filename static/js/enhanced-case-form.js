@@ -39,45 +39,41 @@ function initializeEnhancedCaseForm() {
 
 function initializeDataTableLookups() {
     const dataTableFields = document.querySelectorAll('.data-table-lookup');
-    
+
     dataTableFields.forEach(field => {
         const tableId = field.dataset.tableId;
-        const searchable = field.dataset.searchable === 'true';
-        
-        if (tableId) {
-            loadDataTableOptions(field, tableId);
-        }
-        
-        if (searchable) {
-            // Convert to searchable select (could integrate with libraries like Select2)
-            makeFieldSearchable(field);
-        }
+        const column = field.dataset.column || '';
+        const lookupType = field.dataset.lookupType || field.tagName.toLowerCase();
+        if (!tableId) return;
+
+        loadDataTableOptions(field, tableId, column, lookupType);
     });
 }
 
-function loadDataTableOptions(selectField, tableId) {
-    if (!tableId) return;
-    
-    selectField.classList.add('loading');
-    selectField.disabled = true;
-    
-    fetch(`/enhanced/api/data-tables/${tableId}/search?q=&limit=100`)
+function loadDataTableOptions(field, tableId, column, type) {
+    field.classList.add('loading');
+
+    fetch(`/enhanced/api/data-tables/${tableId}/search?q=&limit=100&column=${column}`)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.results) {
-                populateSelectOptions(selectField, data.results);
+                if (type === 'select') {
+                    populateSelectOptions(field, data.results);
+                    if (field.dataset.searchable === 'true') makeFieldSearchable(field);
+                } else if (type === 'radio' || type === 'checkbox') {
+                    populateChoiceOptions(field, data.results, type, field.dataset.fieldName);
+                } else if (type === 'input') {
+                    populateAutocomplete(field, data.results);
+                }
             } else {
                 console.error('Failed to load data table options:', data.message);
-                showFieldError(selectField, 'Failed to load options');
             }
         })
         .catch(error => {
             console.error('Error loading data table options:', error);
-            showFieldError(selectField, 'Error loading options');
         })
         .finally(() => {
-            selectField.classList.remove('loading');
-            selectField.disabled = false;
+            field.classList.remove('loading');
         });
 }
 
@@ -92,6 +88,44 @@ function populateSelectOptions(selectField, records) {
         option.value = record.id || record.value;
         option.textContent = record.display_name || record.label || record.name;
         selectField.appendChild(option);
+    });
+}
+
+function populateChoiceOptions(container, records, type, fieldName) {
+    container.innerHTML = '';
+    records.forEach((record, idx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'form-check';
+        const input = document.createElement('input');
+        input.type = type;
+        input.name = fieldName;
+        input.value = record.id || record.value;
+        input.id = `${fieldName}_${idx}`;
+        input.className = 'form-check-input case-field';
+        wrapper.appendChild(input);
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.htmlFor = input.id;
+        label.textContent = record.display_name || record.label || record.name;
+        wrapper.appendChild(label);
+        container.appendChild(wrapper);
+    });
+}
+
+function populateAutocomplete(inputField, records) {
+    const dataListId = `${inputField.id || inputField.name}_list`;
+    let list = document.getElementById(dataListId);
+    if (!list) {
+        list = document.createElement('datalist');
+        list.id = dataListId;
+        inputField.setAttribute('list', dataListId);
+        document.body.appendChild(list);
+    }
+    list.innerHTML = '';
+    records.forEach(rec => {
+        const opt = document.createElement('option');
+        opt.value = rec.display_name || rec.label || rec.name;
+        list.appendChild(opt);
     });
 }
 

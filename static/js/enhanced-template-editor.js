@@ -142,40 +142,9 @@ class EnhancedTemplateEditor {
             case 'multiselect':
             case 'radio':
             case 'checkbox':
-                configContainer.innerHTML = `
-                    <div class="mb-3">
-                        <label class="form-label">Options</label>
-                        <div id="optionsContainer">
-                            <div class="input-group mb-2">
-                                <input type="text" class="form-control option-value" placeholder="Option value">
-                                <input type="text" class="form-control option-label" placeholder="Option label">
-                                <button class="btn btn-outline-danger" type="button" onclick="this.closest('.input-group').remove()">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="this.addOption()">
-                            <i class="bi bi-plus"></i> Add Option
-                        </button>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="allowOther">
-                        <label class="form-check-label" for="allowOther">Allow "Other" option</label>
-                    </div>
-                `;
-                break;
-                
-            case 'data_table_lookup':
-                this.configureDataTableLookup(configContainer);
-                break;
-                
-            case 'dependent_field':
-                this.configureDependentField(configContainer);
-                break;
-                
             case 'autocomplete':
-                configContainer.innerHTML = `
-                    <div class="row">
+                const extraConfig = fieldType === 'autocomplete' ? `
+                    <div class="row mt-3">
                         <div class="col-md-6">
                             <label class="form-label">Minimum Search Length</label>
                             <input type="number" class="form-control" id="minSearchLength" value="1" min="1">
@@ -190,8 +159,50 @@ class EnhancedTemplateEditor {
                             <input class="form-check-input" type="checkbox" id="allowCustom" checked>
                             <label class="form-check-label" for="allowCustom">Allow custom values</label>
                         </div>
+                    </div>` : `
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="allowOther">
+                        <label class="form-check-label" for="allowOther">Allow "Other" option</label>
+                    </div>`;
+
+                configContainer.innerHTML = `
+                    <div class="mb-3">
+                        <label class="form-label">Options Source</label>
+                        <select class="form-select" id="optionSource">
+                            <option value="static" selected>Static Options</option>
+                            <option value="table">Data Table</option>
+                        </select>
                     </div>
+                    <div id="staticOptionsSection">
+                        <div class="mb-3">
+                            <label class="form-label">Options</label>
+                            <div id="optionsContainer">
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control option-value" placeholder="Option value">
+                                    <input type="text" class="form-control option-label" placeholder="Option label">
+                                    <button class="btn btn-outline-danger" type="button" onclick="this.closest('.input-group').remove()">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="this.addOption()">
+                                <i class="bi bi-plus"></i> Add Option
+                            </button>
+                        </div>
+                        ${extraConfig}
+                    </div>
+                    <div id="tableOptionsSection" style="display:none;"></div>
                 `;
+                this.configureDataTableLookup(document.getElementById('tableOptionsSection'));
+                document.getElementById('optionSource').addEventListener('change', e => {
+                    document.getElementById('staticOptionsSection').style.display = e.target.value === 'static' ? 'block' : 'none';
+                    document.getElementById('tableOptionsSection').style.display = e.target.value === 'table' ? 'block' : 'none';
+                });
+                break;
+                
+                
+            case 'dependent_field':
+                this.configureDependentField(configContainer);
                 break;
                 
             case 'date':
@@ -263,14 +274,15 @@ class EnhancedTemplateEditor {
                 <h6><i class="bi bi-table"></i> Data Table Configuration</h6>
                 <div class="mb-3">
                     <label class="form-label">Select Data Table</label>
-                    <select class="form-select" id="dataTableSelect">
+                    <select class="form-select" id="dataTableSelect" onchange="templateEditor.loadTableColumns()">
                         <option value="">Select a data table...</option>
                     </select>
-                    <div class="form-text">
-                        <button type="button" class="btn btn-link btn-sm p-0" onclick="this.openDataTableModal()">
-                            View available data tables
-                        </button>
-                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Column</label>
+                    <select class="form-select" id="dataColumnSelect">
+                        <option value="">Select column...</option>
+                    </select>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
@@ -462,17 +474,28 @@ class EnhancedTemplateEditor {
             case 'multiselect':
             case 'radio':
             case 'checkbox':
-                fieldData.config.options = this.collectOptions();
-                fieldData.config.allowOther = document.getElementById('allowOther')?.checked || false;
+            case 'autocomplete': {
+                const source = document.getElementById('optionSource')?.value || 'static';
+                fieldData.config.source = source;
+                if (source === 'static') {
+                    fieldData.config.options = this.collectOptions();
+                    if (fieldData.field_type === 'autocomplete') {
+                        fieldData.config.allowCustom = document.getElementById('allowCustom')?.checked || false;
+                        fieldData.config.minSearchLength = parseInt(document.getElementById('minSearchLength')?.value) || 1;
+                        fieldData.config.maxResults = parseInt(document.getElementById('maxResults')?.value) || 10;
+                    } else {
+                        fieldData.config.allowOther = document.getElementById('allowOther')?.checked || false;
+                    }
+                } else {
+                    fieldData.data_table_id = document.getElementById('dataTableSelect')?.value || '';
+                    fieldData.config.dataColumn = document.getElementById('dataColumnSelect')?.value || '';
+                    fieldData.config.searchable = document.getElementById('searchable')?.checked || true;
+                    fieldData.config.multiSelect = document.getElementById('multiSelect')?.checked || false;
+                    fieldData.config.minSearchLength = parseInt(document.getElementById('minSearchLength')?.value) || 1;
+                    fieldData.config.maxResults = parseInt(document.getElementById('maxResults')?.value) || 10;
+                }
                 break;
-                
-            case 'data_table_lookup':
-                fieldData.config.dataTableId = document.getElementById('dataTableSelect')?.value || '';
-                fieldData.config.searchable = document.getElementById('searchable')?.checked || true;
-                fieldData.config.multiSelect = document.getElementById('multiSelect')?.checked || false;
-                fieldData.config.minSearchLength = parseInt(document.getElementById('minSearchLength')?.value) || 2;
-                fieldData.config.maxResults = parseInt(document.getElementById('maxResults')?.value) || 10;
-                break;
+            }
                 
             case 'dependent_field':
                 fieldData.config.dependsOn = document.getElementById('parentField')?.value || '';
@@ -653,12 +676,6 @@ class EnhancedTemplateEditor {
                 });
                 break;
                 
-            case 'data_table_lookup':
-                preview += '<select class="form-select" disabled>';
-                preview += '<option>Search data table...</option>';
-                preview += '</select>';
-                preview += `<small class="text-muted">Connected to data table: ${field.config.dataTableId || 'Not selected'}</small>`;
-                break;
                 
             case 'dependent_field':
                 preview += '<select class="form-select" disabled>';
@@ -693,7 +710,6 @@ class EnhancedTemplateEditor {
             'multiselect': 'bi-menu-button-wide',
             'radio': 'bi-record-circle',
             'checkbox': 'bi-check-square',
-            'data_table_lookup': 'bi-table',
             'dependent_field': 'bi-diagram-3',
             'autocomplete': 'bi-search',
             'date': 'bi-calendar-date',
@@ -713,7 +729,6 @@ class EnhancedTemplateEditor {
             'multiselect': 'Multi-Select',
             'radio': 'Radio Buttons',
             'checkbox': 'Checkboxes',
-            'data_table_lookup': 'Data Lookup',
             'dependent_field': 'Dependent Field',
             'autocomplete': 'Autocomplete',
             'date': 'Date Picker',
@@ -833,6 +848,28 @@ class EnhancedTemplateEditor {
             })
             .catch(() => {
                 this.dataTables = [];
+            });
+    }
+
+    loadTableColumns() {
+        const tableId = document.getElementById('dataTableSelect')?.value;
+        const columnSelect = document.getElementById('dataColumnSelect');
+        if (!tableId || !columnSelect) return;
+        fetch(`/enhanced/api/data-tables/${tableId}/columns`)
+            .then(r => r.json())
+            .then(data => {
+                columnSelect.innerHTML = '<option value="">Select column...</option>';
+                if (data.success) {
+                    data.columns.forEach(col => {
+                        const opt = document.createElement('option');
+                        opt.value = col.column_name;
+                        opt.textContent = col.display_name || col.column_name;
+                        columnSelect.appendChild(opt);
+                    });
+                }
+            })
+            .catch(() => {
+                columnSelect.innerHTML = '<option value="">Select column...</option>';
             });
     }
 

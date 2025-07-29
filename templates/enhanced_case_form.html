@@ -57,25 +57,46 @@
                                           data-field-id="{{ field.field_id }}">{{ case.case_data[field.field_id] if case else '' }}</textarea>
                             
                             {% elif field.field_type == 'select' %}
-                                <select name="{{ field.field_id }}" 
-                                        class="form-select case-field" 
+                                {% if field.data_table_id %}
+                                <select name="{{ field.field_id }}"
+                                        class="form-select case-field data-table-lookup"
+                                        {% if field.is_required %}required{% endif %}
+                                        data-field-id="{{ field.field_id }}"
+                                        data-table-id="{{ field.data_table_id }}"
+                                        data-column="{{ config.dataColumn }}"
+                                        data-searchable="{{ config.searchable }}">
+                                    <option value="">Select from data table...</option>
+                                </select>
+                                {% else %}
+                                <select name="{{ field.field_id }}"
+                                        class="form-select case-field"
                                         {% if field.is_required %}required{% endif %}
                                         data-field-id="{{ field.field_id }}">
                                     <option value="">Select an option...</option>
                                     {% for option in config.options or [] %}
-                                    <option value="{{ option.value }}" 
+                                    <option value="{{ option.value }}"
                                             {% if case and case.case_data[field.field_id] == option.value %}selected{% endif %}>
                                         {{ option.label }}
                                     </option>
                                     {% endfor %}
                                 </select>
+                                {% endif %}
                             
                             {% elif field.field_type == 'radio' %}
+                                {% if field.data_table_id %}
+                                <div class="data-table-lookup"
+                                     data-lookup-type="radio"
+                                     data-field-name="{{ field.field_id }}"
+                                     data-field-id="{{ field.field_id }}"
+                                     data-table-id="{{ field.data_table_id }}"
+                                     data-column="{{ config.dataColumn }}"
+                                     {% if field.is_required %}data-required="true"{% endif %}></div>
+                                {% else %}
                                 {% for option in config.options or [] %}
                                 <div class="form-check">
-                                    <input class="form-check-input case-field" 
-                                           type="radio" 
-                                           name="{{ field.field_id }}" 
+                                    <input class="form-check-input case-field"
+                                           type="radio"
+                                           name="{{ field.field_id }}"
                                            id="{{ field.field_id }}_{{ loop.index }}"
                                            value="{{ option.value }}"
                                            {% if case and case.case_data[field.field_id] == option.value %}checked{% endif %}
@@ -86,13 +107,22 @@
                                     </label>
                                 </div>
                                 {% endfor %}
+                                {% endif %}
                             
                             {% elif field.field_type == 'checkbox' %}
+                                {% if field.data_table_id %}
+                                <div class="data-table-lookup"
+                                     data-lookup-type="checkbox"
+                                     data-field-name="{{ field.field_id }}[]"
+                                     data-field-id="{{ field.field_id }}"
+                                     data-table-id="{{ field.data_table_id }}"
+                                     data-column="{{ config.dataColumn }}"></div>
+                                {% else %}
                                 {% for option in config.options or [] %}
                                 <div class="form-check">
-                                    <input class="form-check-input case-field" 
-                                           type="checkbox" 
-                                           name="{{ field.field_id }}[]" 
+                                    <input class="form-check-input case-field"
+                                           type="checkbox"
+                                           name="{{ field.field_id }}[]"
                                            id="{{ field.field_id }}_{{ loop.index }}"
                                            value="{{ option.value }}"
                                            {% if case and option.value in (case.case_data[field.field_id] or '').split(',') %}checked{% endif %}
@@ -102,7 +132,17 @@
                                     </label>
                                 </div>
                                 {% endfor %}
-                            
+                                {% endif %}
+
+                            {% elif field.field_type == 'autocomplete' %}
+                                {% if field.data_table_id %}
+                                <input type="text" name="{{ field.field_id }}" class="form-control case-field data-table-lookup"
+                                       data-field-id="{{ field.field_id }}" data-table-id="{{ field.data_table_id }}" data-column="{{ config.dataColumn }}">
+                                {% else %}
+                                <input type="text" name="{{ field.field_id }}" class="form-control case-field"
+                                       value="{{ case.case_data[field.field_id] if case else '' }}">
+                                {% endif %}
+
                             {% elif field.field_type == 'date' %}
                                 <input type="date" 
                                        name="{{ field.field_id }}" 
@@ -130,16 +170,6 @@
                                 </small>
                                 {% endif %}
                             
-                            {% elif field.field_type == 'data_table_lookup' %}
-                                <select name="{{ field.field_id }}" 
-                                        class="form-select case-field data-table-lookup" 
-                                        {% if field.is_required %}required{% endif %}
-                                        data-field-id="{{ field.field_id }}"
-                                        data-table-id="{{ config.dataTableId }}"
-                                        data-searchable="{{ config.searchable }}">
-                                    <option value="">Select from data table...</option>
-                                    <!-- Options will be loaded via JavaScript -->
-                                </select>
                             
                             {% elif field.field_type == 'rating' %}
                                 <div class="rating-field" data-field-id="{{ field.field_id }}">
