@@ -1,0 +1,25 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h2>{{ 'Edit Case Template' if template else 'New Case Template' }}</h2>
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Template Name</label>
+    <input type="text" class="form-control" name="name" value="{{ template.name if template }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    <textarea class="form-control" name="description">{{ template.description if template }}</textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Fields JSON</label>
+    <textarea class="form-control" name="fields" rows="6" required>{{ template.fields|tojson if template }}</textarea>
+    <small class="form-text text-muted">Provide an array of field objects.</small>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Rules JSON</label>
+    <textarea class="form-control" name="rules" rows="4">{{ template.rules|tojson if template }}</textarea>
+    <small class="form-text text-muted">Optional dependent field rules.</small>
+  </div>
+  <button class="btn btn-primary" type="submit">Save Template</button>
+</form>
+{% endblock %}

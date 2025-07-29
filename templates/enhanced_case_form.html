@@ -1,0 +1,312 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-file-earmark-plus"></i> {{ 'Edit Case' if case else 'New Case' }} - {{ template.template.name }}</h2>
+                <div>
+                    <a href="/enhanced/templates" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Templates
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-form-check"></i> Case Information
+                    </h5>
+                    {% if template.template.description %}
+                    <small class="text-muted">{{ template.template.description }}</small>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <form method="post" id="caseForm" enctype="multipart/form-data">
+                        {% for field in template.fields %}
+                        {% set config = field.field_config|from_json if field.field_config else {} %}
+                        <div class="mb-4 field-container" data-field-id="{{ field.field_id }}">
+                            <label class="form-label">
+                                {{ field.field_name }}
+                                {% if field.is_required %}
+                                <span class="text-danger">*</span>
+                                {% endif %}
+                            </label>
+                            
+                            {% if field.field_type == 'text' %}
+                                <input type="text" 
+                                       name="{{ field.field_id }}" 
+                                       class="form-control case-field" 
+                                       value="{{ case.case_data[field.field_id] if case else '' }}"
+                                       placeholder="{{ config.placeholder or '' }}"
+                                       {% if config.maxLength %}maxlength="{{ config.maxLength }}"{% endif %}
+                                       {% if field.is_required %}required{% endif %}
+                                       data-field-id="{{ field.field_id }}">
+                            
+                            {% elif field.field_type == 'textarea' %}
+                                <textarea name="{{ field.field_id }}" 
+                                          class="form-control case-field" 
+                                          rows="{{ config.rows or 3 }}"
+                                          placeholder="{{ config.placeholder or '' }}"
+                                          {% if config.maxLength %}maxlength="{{ config.maxLength }}"{% endif %}
+                                          {% if field.is_required %}required{% endif %}
+                                          data-field-id="{{ field.field_id }}">{{ case.case_data[field.field_id] if case else '' }}</textarea>
+                            
+                            {% elif field.field_type == 'select' %}
+                                {% if field.data_table_id %}
+                                <select name="{{ field.field_id }}"
+                                        class="form-select case-field data-table-lookup"
+                                        {% if field.is_required %}required{% endif %}
+                                        data-field-id="{{ field.field_id }}"
+                                        data-table-id="{{ field.data_table_id }}"
+                                        data-column="{{ config.dataColumn }}"
+                                        data-searchable="{{ config.searchable }}">
+                                    <option value="">Select from data table...</option>
+                                </select>
+                                {% else %}
+                                <select name="{{ field.field_id }}"
+                                        class="form-select case-field"
+                                        {% if field.is_required %}required{% endif %}
+                                        data-field-id="{{ field.field_id }}">
+                                    <option value="">Select an option...</option>
+                                    {% for option in config.options or [] %}
+                                    <option value="{{ option.value }}"
+                                            {% if case and case.case_data[field.field_id] == option.value %}selected{% endif %}>
+                                        {{ option.label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% endif %}
+                            
+                            {% elif field.field_type == 'radio' %}
+                                {% if field.data_table_id %}
+                                <div class="data-table-lookup"
+                                     data-lookup-type="radio"
+                                     data-field-name="{{ field.field_id }}"
+                                     data-field-id="{{ field.field_id }}"
+                                     data-table-id="{{ field.data_table_id }}"
+                                     data-column="{{ config.dataColumn }}"
+                                     {% if field.is_required %}data-required="true"{% endif %}></div>
+                                {% else %}
+                                {% for option in config.options or [] %}
+                                <div class="form-check">
+                                    <input class="form-check-input case-field"
+                                           type="radio"
+                                           name="{{ field.field_id }}"
+                                           id="{{ field.field_id }}_{{ loop.index }}"
+                                           value="{{ option.value }}"
+                                           {% if case and case.case_data[field.field_id] == option.value %}checked{% endif %}
+                                           {% if field.is_required and loop.first %}required{% endif %}
+                                           data-field-id="{{ field.field_id }}">
+                                    <label class="form-check-label" for="{{ field.field_id }}_{{ loop.index }}">
+                                        {{ option.label }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                                {% endif %}
+                            
+                            {% elif field.field_type == 'checkbox' %}
+                                {% if field.data_table_id %}
+                                <div class="data-table-lookup"
+                                     data-lookup-type="checkbox"
+                                     data-field-name="{{ field.field_id }}[]"
+                                     data-field-id="{{ field.field_id }}"
+                                     data-table-id="{{ field.data_table_id }}"
+                                     data-column="{{ config.dataColumn }}"></div>
+                                {% else %}
+                                {% for option in config.options or [] %}
+                                <div class="form-check">
+                                    <input class="form-check-input case-field"
+                                           type="checkbox"
+                                           name="{{ field.field_id }}[]"
+                                           id="{{ field.field_id }}_{{ loop.index }}"
+                                           value="{{ option.value }}"
+                                           {% if case and option.value in (case.case_data[field.field_id] or '').split(',') %}checked{% endif %}
+                                           data-field-id="{{ field.field_id }}">
+                                    <label class="form-check-label" for="{{ field.field_id }}_{{ loop.index }}">
+                                        {{ option.label }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                                {% endif %}
+
+                            {% elif field.field_type == 'autocomplete' %}
+                                {% if field.data_table_id %}
+                                <input type="text" name="{{ field.field_id }}" class="form-control case-field data-table-lookup"
+                                       data-field-id="{{ field.field_id }}" data-table-id="{{ field.data_table_id }}" data-column="{{ config.dataColumn }}">
+                                {% else %}
+                                <input type="text" name="{{ field.field_id }}" class="form-control case-field"
+                                       value="{{ case.case_data[field.field_id] if case else '' }}">
+                                {% endif %}
+
+                            {% elif field.field_type == 'date' %}
+                                <input type="date" 
+                                       name="{{ field.field_id }}" 
+                                       class="form-control case-field" 
+                                       value="{{ case.case_data[field.field_id] if case else '' }}"
+                                       {% if config.minDate %}min="{{ config.minDate }}"{% endif %}
+                                       {% if config.maxDate %}max="{{ config.maxDate }}"{% endif %}
+                                       {% if field.is_required %}required{% endif %}
+                                       data-field-id="{{ field.field_id }}">
+                            
+                            {% elif field.field_type == 'file_upload' %}
+                                <input type="file" 
+                                       name="{{ field.field_id }}" 
+                                       class="form-control case-field" 
+                                       {% if config.allowedTypes %}accept="{{ config.allowedTypes|join(',') }}"{% endif %}
+                                       {% if config.multipleFiles %}multiple{% endif %}
+                                       {% if field.is_required %}required{% endif %}
+                                       data-field-id="{{ field.field_id }}">
+                                {% if config.maxFileSize %}
+                                <small class="form-text text-muted">
+                                    Maximum file size: {{ config.maxFileSize }}MB
+                                    {% if config.allowedTypes %}
+                                    | Allowed types: {{ config.allowedTypes|join(', ') }}
+                                    {% endif %}
+                                </small>
+                                {% endif %}
+                            
+                            
+                            {% elif field.field_type == 'rating' %}
+                                <div class="rating-field" data-field-id="{{ field.field_id }}">
+                                    {% for i in range(1, (config.maxRating or 5) + 1) %}
+                                    <input type="radio" 
+                                           name="{{ field.field_id }}" 
+                                           id="{{ field.field_id }}_{{ i }}"
+                                           value="{{ i }}"
+                                           {% if case and case.case_data[field.field_id] == i|string %}checked{% endif %}
+                                           {% if field.is_required and loop.first %}required{% endif %}>
+                                    <label for="{{ field.field_id }}_{{ i }}">
+                                        {% if config.ratingStyle == 'stars' %}★{% else %}{{ i }}{% endif %}
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            
+                            {% else %}
+                                <!-- Default fallback for unknown field types -->
+                                <input type="text" 
+                                       name="{{ field.field_id }}" 
+                                       class="form-control case-field" 
+                                       value="{{ case.case_data[field.field_id] if case else '' }}"
+                                       {% if field.is_required %}required{% endif %}
+                                       data-field-id="{{ field.field_id }}">
+                            {% endif %}
+                            
+                            {% if config.helpText %}
+                            <small class="form-text text-muted">{{ config.helpText }}</small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="/enhanced/templates" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> {{ 'Update Case' if case else 'Create Case' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar for field dependencies and preview -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-info-circle"></i> Template Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-5">Template:</dt>
+                        <dd class="col-sm-7">{{ template.template.name }}</dd>
+                        
+                        <dt class="col-sm-5">Category:</dt>
+                        <dd class="col-sm-7">{{ template.template.category or 'General' }}</dd>
+                        
+                        <dt class="col-sm-5">Fields:</dt>
+                        <dd class="col-sm-7">{{ template.fields|length }}</dd>
+                        
+                        <dt class="col-sm-5">Required:</dt>
+                        <dd class="col-sm-7">{{ template.fields|selectattr('is_required')|list|length }}</dd>
+                    </dl>
+                    
+                    {% if template.dependencies %}
+                    <div class="mt-3">
+                        <h6><i class="bi bi-diagram-3"></i> Field Dependencies</h6>
+                        <small class="text-muted">Some fields may show/hide based on your selections.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Field dependencies and validation data -->
+<div id="template-data" 
+     data-template-id="{{ template.template.id }}"
+     data-dependencies='{{ template.dependencies|tojson|safe if template.dependencies else "[]" }}'
+     style="display: none;"></div>
+
+<style>
+/* Rating field styles */
+.rating-field input[type="radio"] {
+    display: none;
+}
+
+.rating-field label {
+    font-size: 1.5em;
+    color: #ddd;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.rating-field input[type="radio"]:checked ~ label,
+.rating-field input[type="radio"]:checked + label {
+    color: #ffc107;
+}
+
+.rating-field label:hover,
+.rating-field input[type="radio"]:hover + label {
+    color: #ffc107;
+}
+
+/* Field container styles */
+.field-container {
+    border-left: 3px solid transparent;
+    padding-left: 10px;
+    transition: border-color 0.3s;
+}
+
+.field-container.field-error {
+    border-left-color: #dc3545;
+}
+
+.field-container.field-success {
+    border-left-color: #28a745;
+}
+
+/* Data table lookup loading state */
+.data-table-lookup.loading {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M8 0a8 8 0 0 1 7.6 5.8 7.9 7.9 0 0 1-.9 4.6c-.4.7-.9 1.3-1.5 1.8-.6.5-1.3.9-2 1.2-.8.3-1.6.4-2.4.4-.8 0-1.6-.1-2.4-.4-.7-.3-1.4-.7-2-1.2-.6-.5-1.1-1.1-1.5-1.8a7.9 7.9 0 0 1-.9-4.6A8 8 0 0 1 8 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<script src="/static/js/enhanced-case-form.js"></script>
+{% endblock %}

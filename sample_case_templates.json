@@ -1,0 +1,232 @@
+{
+  "support_ticket_template": {
+    "name": "Support Ticket",
+    "description": "General customer support ticket template",
+    "fields": [
+      {
+        "id": "subject",
+        "name": "Subject",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "customer_name",
+        "name": "Customer Name",
+        "type": "text", 
+        "required": true
+      },
+      {
+        "id": "customer_email",
+        "name": "Customer Email",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "priority",
+        "name": "Priority",
+        "type": "select",
+        "required": true,
+        "options": [
+          {"value": "low", "label": "Low"},
+          {"value": "medium", "label": "Medium"},
+          {"value": "high", "label": "High"},
+          {"value": "urgent", "label": "Urgent"}
+        ]
+      },
+      {
+        "id": "category",
+        "name": "Category",
+        "type": "select",
+        "required": true,
+        "options": [
+          {"value": "technical", "label": "Technical Issue"},
+          {"value": "billing", "label": "Billing Question"},
+          {"value": "feature", "label": "Feature Request"},
+          {"value": "other", "label": "Other"}
+        ]
+      },
+      {
+        "id": "description",
+        "name": "Description",
+        "type": "textarea",
+        "required": true,
+        "rows": 5
+      },
+      {
+        "id": "steps_to_reproduce",
+        "name": "Steps to Reproduce",
+        "type": "textarea",
+        "required": false,
+        "rows": 4
+      },
+      {
+        "id": "expected_behavior",
+        "name": "Expected Behavior",
+        "type": "textarea",
+        "required": false,
+        "rows": 3
+      },
+      {
+        "id": "actual_behavior",
+        "name": "Actual Behavior", 
+        "type": "textarea",
+        "required": false,
+        "rows": 3
+      }
+    ],
+    "rules": []
+  },
+
+  "incident_report_template": {
+    "name": "Incident Report",
+    "description": "Template for reporting system incidents",
+    "fields": [
+      {
+        "id": "incident_title",
+        "name": "Incident Title",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "severity",
+        "name": "Severity Level",
+        "type": "select",
+        "required": true,
+        "options": [
+          {"value": "critical", "label": "Critical - System Down"},
+          {"value": "high", "label": "High - Major Feature Broken"},
+          {"value": "medium", "label": "Medium - Minor Feature Issue"},
+          {"value": "low", "label": "Low - Cosmetic Issue"}
+        ]
+      },
+      {
+        "id": "affected_systems",
+        "name": "Affected Systems",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "incident_start_time",
+        "name": "Incident Start Time",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "incident_description",
+        "name": "Incident Description",
+        "type": "textarea",
+        "required": true,
+        "rows": 6
+      },
+      {
+        "id": "impact_assessment",
+        "name": "Impact Assessment",
+        "type": "textarea",
+        "required": true,
+        "rows": 4
+      },
+      {
+        "id": "initial_response",
+        "name": "Initial Response Actions",
+        "type": "textarea",
+        "required": false,
+        "rows": 4
+      },
+      {
+        "id": "root_cause",
+        "name": "Root Cause Analysis",
+        "type": "textarea",
+        "required": false,
+        "rows": 4
+      },
+      {
+        "id": "resolution_steps",
+        "name": "Resolution Steps",
+        "type": "textarea",
+        "required": false,
+        "rows": 4
+      },
+      {
+        "id": "prevention_measures",
+        "name": "Prevention Measures",
+        "type": "textarea",
+        "required": false,
+        "rows": 3
+      }
+    ],
+    "rules": []
+  },
+
+  "change_request_template": {
+    "name": "Change Request",
+    "description": "Template for system change requests",
+    "fields": [
+      {
+        "id": "change_title",
+        "name": "Change Title",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "requester_name",
+        "name": "Requester Name",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "change_type",
+        "name": "Change Type",
+        "type": "select",
+        "required": true,
+        "options": [
+          {"value": "emergency", "label": "Emergency Change"},
+          {"value": "standard", "label": "Standard Change"},
+          {"value": "normal", "label": "Normal Change"},
+          {"value": "major", "label": "Major Change"}
+        ]
+      },
+      {
+        "id": "business_justification",
+        "name": "Business Justification",
+        "type": "textarea",
+        "required": true,
+        "rows": 4
+      },
+      {
+        "id": "proposed_implementation",
+        "name": "Proposed Implementation",
+        "type": "textarea",
+        "required": true,
+        "rows": 5
+      },
+      {
+        "id": "risk_assessment",
+        "name": "Risk Assessment",
+        "type": "textarea",
+        "required": true,
+        "rows": 4
+      },
+      {
+        "id": "rollback_plan",
+        "name": "Rollback Plan",
+        "type": "textarea",
+        "required": true,
+        "rows": 4
+      },
+      {
+        "id": "testing_plan",
+        "name": "Testing Plan",
+        "type": "textarea",
+        "required": false,
+        "rows": 4
+      },
+      {
+        "id": "maintenance_window",
+        "name": "Preferred Maintenance Window",
+        "type": "text",
+        "required": false
+      }
+    ],
+    "rules": []
+  }
+}

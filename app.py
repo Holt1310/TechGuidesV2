@@ -10,6 +10,17 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'change-this-secret'
 
+# Add custom Jinja filters
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Convert JSON string to Python object"""
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return value or {}
+
 # Global client service queue (in production, use Redis or database)
 CLIENT_SERVICE_QUEUE = {}
 
@@ -17,11 +28,34 @@ CLIENT_SERVICE_QUEUE = {}
 from account_routes import account_bp
 app.register_blueprint(account_bp)
 
+# Import and register the enhanced case management blueprint
+from enhanced_routes import enhanced_bp
+app.register_blueprint(enhanced_bp)
+
 # Initialize database on startup
 try:
     from database_init import init_database
     print("Initializing database...")
     init_database()
+    
+    # Initialize enhanced database
+    from enhanced_database_init import init_enhanced_database, create_sample_data_tables, create_form_builder_configs
+    import time
+    print("Initializing enhanced database...")
+    if init_enhanced_database():
+        try:
+            time.sleep(0.1)  # Small delay to ensure connection is closed
+            create_sample_data_tables()
+        except Exception as e:
+            print(f"Error creating sample data tables: {e}")
+        
+        try:
+            time.sleep(0.1)  # Small delay to ensure connection is closed
+            create_form_builder_configs()
+        except Exception as e:
+            print(f"Error creating form builder configs: {e}")
+        
+        print("Enhanced database initialized successfully!")
 except Exception as e:
     print(f"Database initialization error: {e}")
     print("Continuing without database initialization...")
@@ -1861,55 +1895,94 @@ def manage_data_tables():
     success = None
     
     if request.method == 'POST':
-        action = request.form.get('action', '')
-        
-        if action == 'create':
-            table_name = request.form.get('table_name', '').strip()
-            description = request.form.get('description', '').strip()
+        # Handle both JSON and form data
+        if request.content_type and 'application/json' in request.content_type:
+            # Handle JSON request
+            data = request.get_json()
+            action = data.get('action', '')
             
-            # Parse columns from form
-            columns = []
-            column_count = int(request.form.get('column_count', 0))
-            
-            for i in range(column_count):
-                col_name = request.form.get(f'column_{i}_name', '').strip()
-                col_type = request.form.get(f'column_{i}_type', 'string')
-                col_required = bool(request.form.get(f'column_{i}_required'))
-                col_unique = bool(request.form.get(f'column_{i}_unique'))
+            if action == 'create':
+                table_name = data.get('table_name', '').strip()
+                description = data.get('description', '').strip()
+                columns = data.get('columns', [])
                 
-                if col_name:
-                    columns.append({
-                        'name': col_name,
-                        'type': col_type,
-                        'required': col_required,
-                        'unique': col_unique
-                    })
+                if table_name and columns:
+                    try:
+                        from db_utils import create_custom_table
+                        success_flag, message = create_custom_table(table_name, columns, description)
+                        if success_flag:
+                            return jsonify({'success': True, 'message': message})
+                        else:
+                            return jsonify({'success': False, 'message': message}), 400
+                    except Exception as e:
+                        return jsonify({'success': False, 'message': f"Error creating table: {str(e)}"}), 500
+                else:
+                    return jsonify({'success': False, 'message': "Table name and at least one column are required"}), 400
+                    
+            elif action == 'delete':
+                table_name = data.get('table_name', '').strip()
+                if table_name:
+                    try:
+                        from db_utils import delete_custom_table
+                        success_flag, message = delete_custom_table(table_name)
+                        if success_flag:
+                            return jsonify({'success': True, 'message': message})
+                        else:
+                            return jsonify({'success': False, 'message': message}), 400
+                    except Exception as e:
+                        return jsonify({'success': False, 'message': f"Error deleting table: {str(e)}"}), 500
+                        
+        else:
+            # Handle form submission (existing code)
+            action = request.form.get('action', '')
             
-            if table_name and columns:
-                try:
-                    from db_utils import create_custom_table
-                    success_flag, message = create_custom_table(table_name, columns, description)
-                    if success_flag:
-                        success = message
-                    else:
-                        error = message
-                except Exception as e:
-                    error = f"Error creating table: {str(e)}"
-            else:
-                error = "Table name and at least one column are required"
+            if action == 'create':
+                table_name = request.form.get('table_name', '').strip()
+                description = request.form.get('description', '').strip()
                 
-        elif action == 'delete':
-            table_name = request.form.get('table_name', '').strip()
-            if table_name:
-                try:
-                    from db_utils import delete_custom_table
-                    success_flag, message = delete_custom_table(table_name)
-                    if success_flag:
-                        success = message
-                    else:
-                        error = message
-                except Exception as e:
-                    error = f"Error deleting table: {str(e)}"
+                # Parse columns from form
+                columns = []
+                column_count = int(request.form.get('column_count', 0))
+                
+                for i in range(column_count):
+                    col_name = request.form.get(f'column_{i}_name', '').strip()
+                    col_type = request.form.get(f'column_{i}_type', 'string')
+                    col_required = bool(request.form.get(f'column_{i}_required'))
+                    col_unique = bool(request.form.get(f'column_{i}_unique'))
+                    
+                    if col_name:
+                        columns.append({
+                            'name': col_name,
+                            'type': col_type,
+                            'required': col_required,
+                            'unique': col_unique
+                        })
+                
+                if table_name and columns:
+                    try:
+                        from db_utils import create_custom_table
+                        success_flag, message = create_custom_table(table_name, columns, description)
+                        if success_flag:
+                            success = f"Table '{table_name}' created successfully."
+                        else:
+                            error = message
+                    except Exception as e:
+                        error = f"Error creating table: {e}"
+                else:
+                    error = "Table name and columns are required."
+                    
+            elif action == 'delete':
+                table_name = request.form.get('table_name', '').strip()
+                if table_name:
+                    try:
+                        from db_utils import delete_custom_table
+                        success_flag, message = delete_custom_table(table_name)
+                        if success_flag:
+                            success = message
+                        else:
+                            error = message
+                    except Exception as e:
+                        error = f"Error deleting table: {str(e)}"
     
     # Load existing tables
     try:
@@ -2098,6 +2171,27 @@ def api_get_table_data(table_name):
         return jsonify({'error': 'Failed to load table data'}), 500
 
 
+@app.route('/api/data-tables/<table_name>/related')
+def api_get_related_data(table_name):
+    """Return a single row from a table matching a column value."""
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    column = request.args.get('column', '')
+    value = request.args.get('value', '')
+    return_cols = request.args.getlist('return')
+
+    try:
+        from db_utils import get_custom_table_related_data
+        row = get_custom_table_related_data(f"custom_{table_name}", column, value, return_cols)
+        if row is None:
+            return jsonify({'success': True, 'row': None})
+        return jsonify({'success': True, 'row': row})
+    except Exception as e:
+        print(f"Error getting related data for {table_name}: {e}")
+        return jsonify({'error': 'Failed to get related data'}), 500
+    
+    
 if __name__ == '__main__':
     # Automatically detect local IP address
     auto_ip = get_local_ip()
