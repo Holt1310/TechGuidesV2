@@ -17,11 +17,23 @@ CLIENT_SERVICE_QUEUE = {}
 from account_routes import account_bp
 app.register_blueprint(account_bp)
 
+# Import and register the enhanced case management blueprint
+from enhanced_routes import enhanced_bp
+app.register_blueprint(enhanced_bp)
+
 # Initialize database on startup
 try:
     from database_init import init_database
     print("Initializing database...")
     init_database()
+    
+    # Initialize enhanced database
+    from enhanced_database_init import init_enhanced_database, create_sample_data_tables, create_form_builder_configs
+    print("Initializing enhanced database...")
+    if init_enhanced_database():
+        create_sample_data_tables()
+        create_form_builder_configs()
+        print("Enhanced database initialized successfully!")
 except Exception as e:
     print(f"Database initialization error: {e}")
     print("Continuing without database initialization...")
@@ -2149,6 +2161,8 @@ def new_case():
             return redirect(url_for('case_templates'))
         template_id = templates[0]['id']
     template = get_case_template(int(template_id))
+    if not template:
+        return redirect(url_for('case_templates'))
     if request.method == 'POST':
         case_data = {f['id']: request.form.get(f['id'], '') for f in template['fields']}
         create_case(template['id'], case_data, session.get('username', 'admin'))
@@ -2165,6 +2179,8 @@ def edit_case(case_id):
     if not case:
         return redirect(url_for('cases'))
     template = get_case_template(case['template_id'])
+    if not template:
+        return redirect(url_for('cases'))
     if request.method == 'POST':
         case_data = {f['id']: request.form.get(f['id'], '') for f in template['fields']}
         update_case(case_id, case_data)
