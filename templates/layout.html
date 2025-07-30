@@ -30,21 +30,6 @@
                 <a class="nav-link" href="/categories">Categories</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="/cases">Cases</a>
-              </li>
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="caseManagementDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  <i class="bi bi-gear-fill"></i> Enhanced Cases
-                </a>
-                <ul class="dropdown-menu" aria-labelledby="caseManagementDropdown">
-                  <li><a class="dropdown-item" href="/enhanced/cases"><i class="bi bi-list-task"></i> View Cases</a></li>
-                  <li><a class="dropdown-item" href="/enhanced/templates"><i class="bi bi-file-earmark-text"></i> Templates</a></li>
-                  <li><a class="dropdown-item" href="/enhanced/data-tables"><i class="bi bi-table"></i> Data Tables</a></li>
-                  <li><hr class="dropdown-divider"></li>
-                  <li><a class="dropdown-item" href="/enhanced/template-builder"><i class="bi bi-tools"></i> Template Builder</a></li>
-                </ul>
-              </li>
-              <li class="nav-item">
                 <a class="nav-link" href="/resources-admin">Resource CFG</a>
               </li>
             {% if session.get('secret_admin') %}
@@ -53,9 +38,6 @@
             </li>
               <li class="nav-item">
                 <a class="nav-link" href="/admin/data-tables">Data Tables</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="/admin/case-templates">Case Templates</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="/manage-admins">Admin CFG</a>

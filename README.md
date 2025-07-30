@@ -29,21 +29,4 @@ default password can be set with the `TRUCKSOFT_ADMIN_PASSWORD` environment
 variable. The host and port may be customized with `TRUCKSOFT_HOST` and
 `TRUCKSOFT_PORT`.
 
-### Case Management
-
-Admins can create reusable case templates from **Case Templates** in the
-navigation bar. Templates define fields using JSON and optional dependency
-rules. Once a template exists, open the **Cases** page to file new cases or
-edit existing ones.
-
-### Selenium Automation
-
-The `client_tools/case_creator.py` script demonstrates automated case creation
-with Selenium. Download the Microsoft Edge WebDriver that matches your browser
-version and place `msedgedriver.exe` in the `client_tools` directory. Adjust the
-settings in `case_creator_config.json` then run:
-
-```bash
-python client_tools/case_creator.py
-```
 
