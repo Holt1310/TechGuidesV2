@@ -517,15 +517,7 @@ class TechGuidesClientService:
                         
                     elif tool_type in ['system', 'client_service']:
                         if is_builtin and executable.startswith('builtin:'):
-                            # Handle built-in tools using command system
-                            builtin_tool = executable.replace('builtin:', '')
-                            if builtin_tool == 'case_viewer':
-                                # Schedule on main thread
-                                def create_viewer():
-                                    self.open_case_viewer()
-                                self.root.after(0, create_viewer)
-                            else:
-                                self.log_message(f"Unknown built-in tool: {builtin_tool}")
+                            self.log_message(f"Unknown built-in tool: {executable}")
                         else:
                             # Execute system command
                             self.log_message(f"Executing {tool_name}: {executable}")
@@ -599,25 +591,7 @@ class TechGuidesClientService:
             command_type = parts[1]
             self.log_message(f"Executing command: {command_type}")
             
-            if command_type == 'case':
-                # Handle case commands: cmd|case|case_id|filename|action
-                if len(parts) >= 5:
-                    case_id = parts[2]
-                    filename = parts[3]
-                    action = parts[4]
-                    
-                    if action == 'view':
-                        self.open_case_viewer(case_id, filename)
-                        return True
-                    elif action == 'create':
-                        # Create case using Selenium automation
-                        self.create_external_case(case_id, filename)
-                        return True
-                else:
-                    self.log_message("Invalid case command format")
-                    return False
-                    
-            elif command_type == 'tool':
+            if command_type == 'tool':
                 # Handle tool commands: cmd|tool|tool_id|executable|action
                 if len(parts) >= 5:
                     tool_id = parts[2]
@@ -627,8 +601,6 @@ class TechGuidesClientService:
                     if action == 'launch':
                         if executable == 'standalone':
                             self.log_message(f"Launching standalone {tool_id}")
-                            if tool_id == 'case_viewer':
-                                self.open_case_viewer()
                         else:
                             self.log_message(f"Launching tool: {executable}")
                             subprocess.Popen(executable, shell=True)
@@ -655,135 +627,7 @@ class TechGuidesClientService:
             self.log_message(f"Error executing command: {e}")
             return False
     
-    def open_case_viewer(self, case_id=None, filename=None):
-        """Open the case viewer with optional case data."""
-        try:
-            if case_id and filename:
-                # Download case data from server
-                case_data_url = f"{self.server_url}/api/client-service/case-data/{filename}"
-                response = self.session.get(case_data_url, timeout=10)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if result.get('success'):
-                        case_data = result.get('case_data', {})
-                        self.log_message(f"Opening case viewer for: {case_id}")
-                        
-                        # Schedule the case viewer to run on the main thread
-                        def create_case_viewer():
-                            try:
-                                from simple_case_viewer import SimpleCaseViewer
-                                viewer = SimpleCaseViewer(case_data, parent=self.root)
-                                viewer.show()
-                                self.log_message(f"Case viewer opened for: {case_id}")
-                            except Exception as e:
-                                self.log_message(f"Error creating case viewer: {e}")
-                        
-                        # Use Tkinter's after method to run on main thread
-                        self.root.after(0, create_case_viewer)
-                        return True
-                    else:
-                        self.log_message(f"Failed to get case data: {result.get('error', 'Unknown error')}")
-                else:
-                    self.log_message(f"Failed to download case data: HTTP {response.status_code}")
-            else:
-                # Open standalone case viewer
-                def create_standalone_viewer():
-                    try:
-                        from simple_case_viewer import SimpleCaseViewer
-                        viewer = SimpleCaseViewer(parent=self.root)
-                        viewer.show()
-                        self.log_message("Standalone case viewer opened")
-                    except Exception as e:
-                        self.log_message(f"Error creating standalone case viewer: {e}")
-                
-                # Use Tkinter's after method to run on main thread
-                self.root.after(0, create_standalone_viewer)
-                return True
-                
-        except Exception as e:
-            self.log_message(f"Error opening case viewer: {e}")
-            return False
     
-    def create_external_case(self, case_id, filename):
-        """Create a case in external system using Selenium automation."""
-        try:
-            self.log_message(f"Starting case creation for: {case_id}")
-            
-            # Download case data from server
-            case_data_url = f"{self.server_url}/api/client-service/case-data/{filename}"
-            response = self.session.get(case_data_url, timeout=10)
-            
-            if response.status_code != 200:
-                self.log_message(f"Failed to download case data: HTTP {response.status_code}")
-                return False
-            
-            result = response.json()
-            if not result.get('success'):
-                self.log_message(f"Failed to get case data: {result.get('error', 'Unknown error')}")
-                return False
-            
-            case_data = result.get('case_data', {})
-            
-            # Import and use the case creator on a separate thread
-            def run_case_creation():
-                try:
-                    from case_creator import CaseCreator
-                    
-                    # Create case creator with callback for logging
-                    creator = CaseCreator(log_callback=self.log_message)
-                    
-                    # Create the case
-                    external_case_number = creator.create_case_from_techguides_data(case_data)
-                    
-                    if external_case_number:
-                        self.log_message(f"Successfully created external case: {external_case_number}")
-                        
-                        # Report back to server
-                        self.report_case_creation_result(case_id, external_case_number, True)
-                    else:
-                        self.log_message(f"Failed to create external case for: {case_id}")
-                        self.report_case_creation_result(case_id, None, False)
-                        
-                except ImportError as e:
-                    self.log_message(f"Error importing case_creator module: {e}")
-                    self.log_message("Make sure case_creator.py is in the client_tools directory")
-                    self.report_case_creation_result(case_id, None, False)
-                except Exception as e:
-                    self.log_message(f"Error in case creation: {e}")
-                    self.report_case_creation_result(case_id, None, False)
-            
-            # Run case creation in a separate thread to avoid blocking the UI
-            creation_thread = threading.Thread(target=run_case_creation, daemon=True)
-            creation_thread.start()
-            
-            return True
-            
-        except Exception as e:
-            self.log_message(f"Error starting case creation: {e}")
-            return False
-    
-    def report_case_creation_result(self, techguides_case_id, external_case_number, success):
-        """Report the result of case creation back to the server."""
-        try:
-            report_data = {
-                'techguides_case_id': techguides_case_id,
-                'external_case_number': external_case_number,
-                'success': success,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            # Send result back to server
-            report_url = f"{self.server_url}/api/client-service/case-creation-result"
-            response = self.session.post(report_url, json=report_data, timeout=10)
-            
-            if response.status_code == 200:
-                self.log_message(f"Case creation result reported to server")
-            else:
-                self.log_message(f"Failed to report case creation result: HTTP {response.status_code}")
-                
-        except Exception as e:
-            self.log_message(f"Error reporting case creation result: {e}")
     
     def create_tray_icon(self):
         """Create system tray icon"""
